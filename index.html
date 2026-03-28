@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#08090e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Anchor</title>
+<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiQW5jaG9yIiwic2hvcnRfbmFtZSI6IkFuY2hvciIsInN0YXJ0X3VybCI6Ii4iLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImJhY2tncm91bmRfY29sb3IiOiIjMDgwOTBlIiwidGhlbWVfY29sb3IiOiIjMDgwOTBlIn0=">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet"></noscript>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+button,input,select,textarea{touch-action:manipulation;-webkit-appearance:none;appearance:none;user-select:none;-webkit-user-select:none}
+html,body{height:100%;overflow:hidden;background:#08090e;color:rgba(255,255,255,.9);font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;touch-action:manipulation}
+body{display:flex;justify-content:center}
+#app{width:100%;max-width:430px;height:100%;position:relative;overflow:hidden}
+.screen{position:absolute;top:0;right:0;bottom:0;left:0;display:none;flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch;z-index:1}
+.screen.active{display:flex;z-index:10}
+canvas#flowCanvas{position:absolute;top:0;left:0;width:100%;height:100%}
+
+/* Buttons */
+.btn{width:100%;padding:15px 24px;border-radius:14px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:rgba(255,255,255,.9);font-size:15px;font-weight:600;font-family:'DM Sans',sans-serif;line-height:1;cursor:pointer;-webkit-appearance:none;appearance:none;touch-action:manipulation;user-select:none;-webkit-user-select:none;min-height:48px;position:relative;z-index:5}
+.btn:active{transform:scale(.97);opacity:.8}
+.btn-accent{background:linear-gradient(135deg,rgba(0,212,170,.15),rgba(0,153,255,.15));border-color:rgba(0,212,170,.3)}
+.btn-ghost{background:transparent;border-color:rgba(255,255,255,.08);color:rgba(255,255,255,.5)}
+.btn-dim{background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.08)}
+
+/* Timer ring */
+.timer-ring{position:absolute;bottom:32px;left:50%;transform:translateX(-50%)}
+@supports(bottom:env(safe-area-inset-bottom)){.timer-ring{bottom:env(safe-area-inset-bottom,32px)}}
+.timer-ring circle.track{fill:none;stroke:rgba(255,255,255,.08);stroke-width:3}
+.timer-ring circle.progress{fill:none;stroke:rgba(255,255,255,.65);stroke-width:3;stroke-linecap:round;transition:stroke-dashoffset .4s ease;transform:rotate(-90deg);transform-origin:50% 50%}
+.timer-text{font:500 22px/1 'DM Mono',monospace;fill:rgba(255,255,255,.85)}
+
+/* Rating dots */
+.rating-row{display:flex;justify-content:center}
+.rating-row>*{margin:0 5px}
+.rating-dot{width:48px;height:48px;border-radius:50%;border:2px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.3);font:500 16px/1 'DM Mono',monospace;cursor:pointer;touch-action:manipulation;-webkit-appearance:none;appearance:none;user-select:none;-webkit-user-select:none}
+.rating-dot.on{border-color:rgba(255,255,255,.7);background:rgba(255,255,255,.12);color:rgba(255,255,255,.9)}
+
+/* Step circles */
+.step-num{min-width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font:400 13px/1 'DM Mono',monospace;color:rgba(255,255,255,.5)}
+
+/* Session history dots */
+.hist-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.08);display:inline-block}
+.hist-dot.on{background:rgba(255,255,255,.45)}
+
+/* Sound toggle */
+.sound-btn{width:48px;height:48px;border-radius:50%;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.5);color:rgba(255,255,255,.75);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;-webkit-appearance:none;appearance:none;user-select:none;-webkit-user-select:none}
+.sound-btn.playing{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3)}
+@supports(backdrop-filter:blur(10px)){.sound-btn{backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}}
+
+/* Progress bar */
+.progress-track{height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;border-radius:2px;background:rgba(255,255,255,.25);transition:width .5s ease}
+.progress-fill.done{background:linear-gradient(90deg,rgba(0,212,170,.7),rgba(0,153,255,.7))}
+
+/* Spinner */
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{width:44px;height:44px;border:2px solid rgba(255,255,255,.1);border-top-color:rgba(255,255,255,.5);border-radius:50%;animation:spin .8s linear infinite}
+
+/* Safe area padding */
+.safe-bottom{padding-bottom:20px}
+@supports(padding-bottom:env(safe-area-inset-bottom)){.safe-bottom{padding-bottom:env(safe-area-inset-bottom,20px)}}
+
+/* Gap fallbacks via margin */
+#anchorUI>*+*{margin-top:14px}
+#anchorUI>div>button+button{margin-top:10px}
+#historyList>*+*{margin-top:5px}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HOME -->
+  <div id="screen-home" class="screen active">
+    <div style="flex:1;display:flex;flex-direction:column;padding:24px">
+      <!-- Header -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-top:8px">
+        <div>
+          <div style="font:700 22px/1 'DM Sans',sans-serif;letter-spacing:-.5px">Anchor</div>
+          <div style="font:400 11px/1 'DM Mono',monospace;color:rgba(255,255,255,.3);margin-top:4px">эмоциональный якорь</div>
+        </div>
+        <button id="btnReset" style="display:none;background:0;border:0;color:rgba(255,255,255,.25);font:400 11px/1 'DM Mono',monospace;cursor:pointer;padding:8px 12px;min-height:40px">сбросить</button>
+      </div>
+
+      <!-- Empty state -->
+      <div id="emptyState" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+        <div style="width:96px;height:96px;border-radius:50%;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02);display:flex;align-items:center;justify-content:center;margin-bottom:24px">
+          <span style="font-size:36px;opacity:.35">◎</span>
+        </div>
+        <div style="font:600 19px/1.2 'DM Sans',sans-serif;color:rgba(255,255,255,.85);margin-bottom:10px">Создай свой якорь</div>
+        <p style="font:400 14px/1.6 'DM Sans',sans-serif;color:rgba(255,255,255,.4);max-width:280px;margin-bottom:28px">Уникальная комбинация визуала и&nbsp;звука, которая станет триггером для нужного эмоционального состояния</p>
+        <button class="btn" id="btnStart" style="max-width:220px">Начать</button>
+      </div>
+
+      <!-- Anchor UI (hidden until anchor exists) -->
+      <div id="anchorUI" style="display:none;flex:1;flex-direction:column">
+        <!-- Preview card -->
+        <div style="position:relative;width:100%;height:180px;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.06)">
+          <canvas id="previewCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%"></canvas>
+          <div style="position:absolute;bottom:12px;left:14px;right:14px;display:flex;justify-content:space-between;align-items:center">
+            <div style="background:rgba(0,0,0,.5);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:8px;padding:5px 10px">
+              <span id="anchorLabel" style="font:400 11px/1 'DM Mono',monospace;color:rgba(255,255,255,.55)"></span>
+            </div>
+            <button id="btnPreviewSound" class="sound-btn">♪</button>
+          </div>
+        </div>
+
+        <!-- Progress -->
+        <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <span style="font:400 13px/1 'DM Sans',sans-serif;color:rgba(255,255,255,.5)">Прогресс закрепления</span>
+            <span id="progressLabel" style="font:400 13px/1 'DM Mono',monospace;color:rgba(255,255,255,.7)"></span>
+          </div>
+          <div class="progress-track"><div id="progressFill" class="progress-fill"></div></div>
+          <div id="anchoredBadge" style="display:none;margin-top:10px;font:400 12px/1 'DM Mono',monospace;color:rgba(0,212,170,.7)">✓ якорь закреплён</div>
+        </div>
+
+        <!-- Buttons -->
+        <div style="display:flex;flex-direction:column">
+          <button id="btnReinforce" class="btn">Сессия закрепления</button>
+          <button id="btnActivate" class="btn btn-accent" style="display:none">⚡ Активировать якорь</button>
+        </div>
+
+        <!-- History -->
+        <div id="historyBlock" style="display:none;background:rgba(255,255,255,.02);border-radius:14px;padding:14px;border:1px solid rgba(255,255,255,.04)">
+          <div style="font:400 11px/1 'DM Mono',monospace;color:rgba(255,255,255,.3);letter-spacing:.5px;margin-bottom:10px">ИСТОРИЯ СЕССИЙ</div>
+          <div id="historyList" style="display:flex;flex-direction:column;max-height:140px;overflow-y:auto"></div>
+        </div>
+
+        <button id="btnRegenerate" style="background:0;border:0;color:rgba(255,255,255,.2);font:400 12px/1 'DM Mono',monospace;cursor:pointer;padding:10px;text-align:center;width:100%;min-height:44px">сгенерировать новый якорь</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ONBOARDING -->
+  <div id="screen-onboarding" class="screen">
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center">
+      <div style="font-size:40px;margin-bottom:16px">🧠</div>
+      <div style="font:600 20px/1.2 'DM Sans',sans-serif;color:rgba(255,255,255,.85);margin-bottom:24px">Как это работает</div>
+      <div style="display:flex;flex-direction:column;text-align:left;max-width:320px">
+        <div style="display:flex;align-items:flex-start;margin-bottom:20px">
+          <div class="step-num" style="margin-right:14px">1</div>
+          <div>
+            <div style="font:600 15px/1.2 'DM Sans',sans-serif;color:rgba(255,255,255,.9);margin-bottom:4px">Создай якорь</div>
+            <div style="font:400 13px/1.5 'DM Sans',sans-serif;color:rgba(255,255,255,.45)">Приложение сгенерирует уникальную комбинацию визуала и звука — твой персональный сенсорный якорь.</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-start;margin-bottom:20px">
+          <div class="step-num" style="margin-right:14px">2</div>
+          <div>
+            <div style="font:600 15px/1.2 'DM Sans',sans-serif;color:rgba(255,255,255,.9);margin-bottom:4px">Закрепляй</div>
+            <div style="font:400 13px/1.5 'DM Sans',sans-serif;color:rgba(255,255,255,.45)">В моменты спокойствия — запускай 30-секундную сессию. Сосредоточься на ощущении, смотри и слушай.</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-start">
+          <div class="step-num" style="margin-right:14px">3</div>
+          <div>
+            <div style="font:600 15px/1.2 'DM Sans',sans-serif;color:rgba(255,255,255,.9);margin-bottom:4px">Активируй</div>
+            <div style="font:400 13px/1.5 'DM Sans',sans-serif;color:rgba(255,255,255,.45)">После 10 закреплений якорь готов. Запускай его перед стрессовым событием.</div>
+          </div>
+        </div>
+      </div>
+      <button class="btn" id="btnOnboardGenerate" style="max-width:280px;margin-top:36px">Создать мой якорь</button>
+    </div>
+  </div>
+
+  <!-- GENERATING -->
+  <div id="screen-generating" class="screen">
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center">
+      <div class="spinner"></div>
+      <p style="font:400 15px/1 'DM Sans',sans-serif;color:rgba(255,255,255,.5);margin-top:24px">Генерирую твой якорь…</p>
+    </div>
+  </div>
+
+  <!-- SESSION -->
+  <div id="screen-session" class="screen">
+    <canvas id="flowCanvas"></canvas>
+    <div style="position:absolute;top:0;left:0;right:0;padding:16px 20px 0;display:flex;justify-content:space-between;align-items:center;z-index:2">
+      <span id="sessionModeLabel" style="font:400 11px/1 'DM Mono',monospace;color:rgba(255,255,255,.45);letter-spacing:1px;text-transform:uppercase"></span>
+      <button id="btnCancelSession" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.55);border-radius:20px;padding:10px 20px;font:400 13px/1 'DM Sans',sans-serif;cursor:pointer;min-height:44px">✕</button>
+    </div>
+    <div id="sessionHint" style="position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);color:rgba(255,255,255,.3);font:400 14px/1.5 'DM Sans',sans-serif;text-align:center;letter-spacing:.3px;z-index:2;pointer-events:none;padding:0 32px"></div>
+    <div class="timer-ring">
+      <svg width="100" height="100" viewBox="0 0 100 100">
+        <circle class="track" cx="50" cy="50" r="44"/>
+        <circle id="timerProgress" class="progress" cx="50" cy="50" r="44" stroke-dasharray="276.46" stroke-dashoffset="276.46"/>
+        <text class="timer-text" x="50" y="56" text-anchor="middle" id="timerText">30</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- RATING -->
+  <div id="screen-rating" class="screen">
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center">
+      <div style="font-size:30px;margin-bottom:14px;opacity:.7">✦</div>
+      <div style="font:600 20px/1.2 'DM Sans',sans-serif;color:rgba(255,255,255,.85);margin-bottom:8px">Сессия завершена</div>
+      <p id="ratingQuestion" style="font:400 14px/1.5 'DM Sans',sans-serif;color:rgba(255,255,255,.45);margin-bottom:28px"></p>
+      <div class="rating-row" id="ratingRow"></div>
+      <div style="display:flex;justify-content:space-between;width:230px;margin-top:8px;font:400 11px/1 'DM Mono',monospace;color:rgba(255,255,255,.2)">
+        <span>слабо</span><span>сильно</span>
+      </div>
+      <button id="btnSaveRating" class="btn btn-dim" style="max-width:280px;margin-top:32px;opacity:.3;pointer-events:none">Сохранить</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Global error handler: if any JS error occurs, ensure buttons still work
+window.onerror=function(msg,url,line){
+  try{console.error("Anchor error:",msg,"at line",line);
+    // If data is corrupt, clear it so app can start fresh on reload
+    if(msg&&(msg.indexOf("Cannot read")>-1||msg.indexOf("undefined")>-1||msg.indexOf("null")>-1)){
+      localStorage.removeItem("anchor_params");localStorage.removeItem("anchor_sessions");
+    }
+  }catch(e){}
+};
+// ═══════════════════════════════════════════
+//  SIMPLEX NOISE
+// ═══════════════════════════════════════════
+const GRAD3=[[1,1,0],[-1,1,0],[1,-1,0],[-1,-1,0],[1,0,1],[-1,0,1],[1,0,-1],[-1,0,-1],[0,1,1],[0,-1,1],[0,1,-1],[0,-1,-1]];
+function buildPerm(seed){const p=Array.from({length:256},(_,i)=>i);let s=seed;for(let i=255;i>0;i--){s=(s*16807+11)%2147483647;const j=s%(i+1);[p[i],p[j]]=[p[j],p[i]]}return[...p,...p]}
+function noise2D(perm,x,y){const F2=.5*(Math.sqrt(3)-1),G2=(3-Math.sqrt(3))/6,s=(x+y)*F2,i=Math.floor(x+s),j=Math.floor(y+s),t=(i+j)*G2,x0=x-(i-t),y0=y-(j-t),[i1,j1]=x0>y0?[1,0]:[0,1],x1=x0-i1+G2,y1=y0-j1+G2,x2=x0-1+2*G2,y2=y0-1+2*G2,ii=i&255,jj=j&255;const dot=(gi,dx,dy)=>GRAD3[gi%12][0]*dx+GRAD3[gi%12][1]*dy;let n0=0,n1=0,n2=0,t0=.5-x0*x0-y0*y0;if(t0>0){t0*=t0;n0=t0*t0*dot(perm[ii+perm[jj]],x0,y0)}let t1=.5-x1*x1-y1*y1;if(t1>0){t1*=t1;n1=t1*t1*dot(perm[ii+i1+perm[jj+j1]],x1,y1)}let t2=.5-x2*x2-y2*y2;if(t2>0){t2*=t2;n2=t2*t2*dot(perm[ii+1+perm[jj+1]],x2,y2)}return 70*(n0+n1+n2)}
+
+// ═══════════════════════════════════════════
+//  PALETTES & SOUNDS
+// ═══════════════════════════════════════════
+const PALETTES=[
+  {name:"aurora",bg:"#0a0e1a",colors:["#00d4aa","#0099ff","#7b68ee","#00d4aa"]},
+  {name:"ember",bg:"#1a0a0a",colors:["#ff6b35","#f7c59f","#efa94a","#ff6b35"]},
+  {name:"ocean",bg:"#060e1a",colors:["#0077b6","#00b4d8","#90e0ef","#0077b6"]},
+  {name:"forest",bg:"#0a1a0e",colors:["#2d6a4f","#52b788","#95d5b2","#2d6a4f"]},
+  {name:"nebula",bg:"#120a1a",colors:["#9b5de5","#f15bb5","#fee440","#9b5de5"]},
+  {name:"arctic",bg:"#0a141a",colors:["#a8dadc","#457b9d","#e0fbfc","#a8dadc"]},
+  {name:"copper",bg:"#12090a",colors:["#b87333","#cd9b6a","#e8c49a","#8b5e3c"]},
+  {name:"sakura",bg:"#140a10",colors:["#ffb7c5","#ff69b4","#c9a0dc","#ffb7c5"]},
+  {name:"moss",bg:"#080e08",colors:["#6b8f71","#aad576","#d4e09b","#6b8f71"]},
+  {name:"storm",bg:"#0a0a12",colors:["#4a5568","#a0aec0","#e2e8f0","#667eea"]},
+  {name:"mars",bg:"#140804",colors:["#c1440e","#e77d4b","#ffa07a","#8b2500"]},
+  {name:"deep",bg:"#04060e",colors:["#1a237e","#5c6bc0","#9fa8da","#1a237e"]},
+  {name:"gold",bg:"#0e0c06",colors:["#ffd700","#daa520","#f0e68c","#b8860b"]},
+  {name:"coral",bg:"#100808",colors:["#ff6f61","#ff9a8b","#ffd1c1","#e8505b"]},
+];
+const SOUNDS=[]; // kept for compat, not used anymore
+
+// ═══════════════════════════════════════════
+//  PROCEDURAL SOUND DNA (generated from seed)
+// ═══════════════════════════════════════════
+// Musical scales (semitone offsets from root)
+const SCALES={
+  pentatonic:[0,2,4,7,9],
+  minor:[0,2,3,5,7,8,10],
+  dorian:[0,2,3,5,7,9,10],
+  lydian:[0,2,4,6,7,9,11],
+  japanese:[0,1,5,7,8],
+  wholetone:[0,2,4,6,8,10],
+  blues:[0,3,5,6,7,10],
+};
+const SCALE_NAMES=Object.keys(SCALES);
+
+// Waveform palettes for timbral variety
+const WAVE_SETS=[
+  ["sine","sine","triangle"],
+  ["sine","triangle","sine"],
+  ["triangle","sine","sine"],
+  ["sine","sine","sine"],
+  ["triangle","triangle","sine"],
+];
+
+// Binaural beat targets (Hz difference between ears)
+const BINAURAL_BANDS=[
+  {name:"theta",lo:4,hi:7},    // deep relaxation
+  {name:"alpha",lo:8,hi:12},   // calm focus
+  {name:"lo-beta",lo:12,hi:16},// alert calm
+];
+
+function generateSoundDNA(seed){
+  let s=seed;
+  const r=()=>{s=(s*16807+11)%2147483647;return s/2147483647};
+
+  // Root note: continuous range 65-175 Hz (C2-F3)
+  const rootFreq=65+r()*110;
+
+  // Pick a scale
+  const scaleIdx=Math.floor(r()*SCALE_NAMES.length);
+  const scale=SCALES[SCALE_NAMES[scaleIdx]];
+
+  // Pick 3-5 chord tones from scale (as semitone offsets)
+  const numTones=3+Math.floor(r()*3);
+  const chordTones=[0]; // always include root
+  const available=[...scale.slice(1)];
+  for(let i=0;i<Math.min(numTones-1,available.length);i++){
+    const idx=Math.floor(r()*available.length);
+    chordTones.push(available.splice(idx,1)[0]);
+  }
+  // optionally add octave
+  if(r()>.4) chordTones.push(12);
+  if(r()>.7) chordTones.push(scale[Math.floor(r()*scale.length)]+12);
+
+  // Convert semitones to frequency ratios
+  const freqRatios=chordTones.map(st=>Math.pow(2,st/12));
+
+  // Waveforms
+  const waveSet=WAVE_SETS[Math.floor(r()*WAVE_SETS.length)];
+
+  // Binaural: pick 2 bands, each with specific beat frequency
+  const bin1band=BINAURAL_BANDS[Math.floor(r()*BINAURAL_BANDS.length)];
+  const bin1freq=bin1band.lo+r()*(bin1band.hi-bin1band.lo);
+  let bin2idx=Math.floor(r()*BINAURAL_BANDS.length);
+  const bin2band=BINAURAL_BANDS[bin2idx];
+  const bin2freq=bin2band.lo+r()*(bin2band.hi-bin2band.lo);
+
+  // Binaural carrier frequencies (different from chord root for richness)
+  const binCarrier1=rootFreq*(r()>.5?1:0.5);
+  const binCarrier2=rootFreq*(r()>.5?1.5:2);
+
+  // LFO parameters per voice (slow modulation for movement)
+  const voiceLFOs=freqRatios.map(()=>({
+    rate:.02+r()*.12,        // 0.02-0.14 Hz
+    freqDepth:1+r()*6,       // pitch wobble in Hz
+    ampRate:.05+r()*.15,     // amplitude LFO rate
+    ampDepth:.15+r()*.35,    // amplitude modulation depth (0-1)
+    ampPhase:r()*Math.PI*2,  // phase offset so voices breathe differently
+  }));
+
+  // Drift: slow pitch evolution over session (unique per anchor)
+  const driftSpeed=.001+r()*.003;
+  const driftRange=.5+r()*2; // Hz total drift
+
+  // Sub bass presence (0 = none, 1 = strong)
+  const subBass=r()>.4?(.2+r()*.4):0;
+  const subFreq=rootFreq*0.5;
+
+  // Shimmer layer: high harmonic ghost
+  const shimmer=r()>.35?(.03+r()*.08):0;
+  const shimmerRatio=freqRatios[Math.floor(r()*freqRatios.length)]*4; // 2 octaves up
+
+  // Noise texture
+  const noiseAmount=.005+r()*.025; // very subtle filtered noise
+
+  // Rhythmic pulse (subtle amplitude modulation giving a "breathing" feel)
+  const pulseRate=.08+r()*.15; // slow breathing: one cycle every 7-12 seconds
+  const pulseDepth=.08+r()*.2;
+
+  // ── Melodic layers ──
+
+  // Arpeggiator: slow cycling through chord tones
+  const arpEnabled=true; // always on for melodicity
+  const arpInterval=2.5+r()*4; // seconds between notes (2.5-6.5s → very slow)
+  const arpAttack=.8+r()*1.5; // long fade-in (0.8-2.3s)
+  const arpRelease=1.5+r()*2.5; // long fade-out (1.5-4s)
+  const arpVol=.04+r()*.04; // gentle (0.04-0.08)
+  const arpOctave=r()>.5?1:2; // play 1 or 2 octaves above root
+  const arpWave=r()>.6?"triangle":"sine";
+  // Build a deterministic note sequence from chord tones
+  const arpSequence=[];
+  for(let i=0;i<16;i++){
+    arpSequence.push(chordTones[Math.floor(r()*chordTones.length)]);
+  }
+  // Slight humanization: per-note timing offset
+  const arpSwing=.05+r()*.2; // 0-1, fraction of interval for timing jitter
+  const arpTimingOffsets=arpSequence.map(()=>(r()-.5)*2); // -1..1, multiplied by swing
+
+  // Bells: occasional high sparkle tones
+  const bellEnabled=r()>.15; // ~85% chance
+  const bellInterval=4+r()*6; // seconds between bells (4-10s)
+  const bellDecay=1+r()*2; // exponential decay time (1-3s)
+  const bellVol=.02+r()*.03; // very quiet (0.02-0.05)
+  const bellOctaveShift=2+Math.floor(r()*2); // 2-3 octaves above root
+  const bellWave="sine";
+  // Bell note sequence from full scale
+  const bellSequence=[];
+  for(let i=0;i<12;i++){
+    bellSequence.push(scale[Math.floor(r()*scale.length)]);
+  }
+  // Some bells get a soft detune for shimmer
+  const bellDetunes=bellSequence.map(()=>(r()-.5)*6); // ±3 cents
+
+  return{
+    rootFreq,scaleIdx,freqRatios,chordTones,scale,waveSet,
+    bin1freq,bin1carrier:binCarrier1,
+    bin2freq,bin2carrier:binCarrier2,
+    voiceLFOs,driftSpeed,driftRange,
+    subBass,subFreq,shimmer,shimmerRatio,
+    noiseAmount,pulseRate,pulseDepth,
+    arpEnabled,arpInterval,arpAttack,arpRelease,arpVol,arpOctave,arpWave,
+    arpSequence,arpSwing,arpTimingOffsets,
+    bellEnabled,bellInterval,bellDecay,bellVol,bellOctaveShift,bellWave,
+    bellSequence,bellDetunes
+  };
+}
+
+// ═══════════════════════════════════════════
+//  VISUAL DNA (generated from seed)
+// ═══════════════════════════════════════════
+const SYMMETRY_MODES=["none","mirror_x","mirror_y","radial_2","radial_3","radial_4","spiral"];
+
+function generateVisualDNA(seed){
+  let s=seed^0xDEAD;
+  const r=()=>{s=(s*16807+11)%2147483647;return s/2147483647};
+
+  const symmetry=SYMMETRY_MODES[Math.floor(r()*SYMMETRY_MODES.length)];
+  const loopSeconds=6+Math.floor(r()*5); // 6-10 sec cycle
+  const noiseRadius=.3+r()*.6; // how much field changes over cycle
+  const scale=.002+r()*.005;
+  const flowSpeed=.3+r()*.6;
+  const numParticles=180+Math.floor(r()*180); // 180-360
+  const trailFade=.025+r()*.055; // lower = longer trails
+  const particleSize=.8+r()*1.8;
+  const sizeVariance=r()*.6; // 0 = uniform, .6 = very varied
+  const colorCycle=r()>.5; // particles shift color over lifetime
+  const glowAmount=r()>.4?(.3+r()*.7):0; // soft glow on particles
+  const spiralTwist=r()*2-1; // -1 to 1, affects flow angle offset
+  const fieldComplexity=1+Math.floor(r()*3); // 1-3 octaves of noise
+  const pulseScale=r()>.4?(.02+r()*.04):0; // breathing scale pulse
+
+  // Deterministic initial positions (seeded PRNG, not Math.random)
+  let ps=seed^0xBEEF;
+  const rp=()=>{ps=(ps*48271+1)%2147483647;return ps/2147483647};
+  const spawnData=Array.from({length:numParticles},()=>({
+    rx:rp(),ry:rp(),phase:rp(),ci:Math.floor(rp()*4),
+    sizeOff:rp(),speedOff:.7+rp()*.6
+  }));
+
+  return{symmetry,loopSeconds,noiseRadius,scale,flowSpeed,numParticles,
+    trailFade,particleSize,sizeVariance,colorCycle,glowAmount,
+    spiralTwist,fieldComplexity,pulseScale,spawnData};
+}
+
+function generateAnchorParams(seed){
+  let s=seed;const r=()=>{s=(s*16807+11)%2147483647;return s/2147483647};
+  const pi=Math.floor(r()*PALETTES.length);
+  const soundDNA=generateSoundDNA(seed);
+  const visualDNA=generateVisualDNA(seed);
+  return{seed,paletteIdx:pi,palette:PALETTES[pi],soundDNA,visualDNA};
+}
+
+// ═══════════════════════════════════════════
+//  SOUND ENGINE v2
+// ═══════════════════════════════════════════
+class AnchorSound{
+  constructor(params){this.params=params;this.ctx=null;this.nodes=[];this.master=null;this.alive=false;this.schedulers=[]}
+
+  async start(){
+    this.ctx=new(window.AudioContext||window.webkitAudioContext)();
+    if(this.ctx.state==="suspended") await this.ctx.resume();
+    this.alive=true;
+    const ctx=this.ctx;
+    const now=ctx.currentTime;
+    const dna=this.params.soundDNA;
+
+    // Master gain with fade-in
+    this.master=ctx.createGain();
+    this.master.gain.setValueAtTime(0,now);
+    this.master.gain.linearRampToValueAtTime(.28,now+2.5);
+
+    // ── Master EQ: gentle low-pass to remove harsh highs ──
+    // Two cascaded 2nd-order filters = 4th order (-24dB/oct) rolloff
+    // Cutoff 4.8kHz: keeps warmth and presence, removes piercing frequencies
+    const lp1=ctx.createBiquadFilter();lp1.type="lowpass";lp1.frequency.value=4800;lp1.Q.value=.7;
+    const lp2=ctx.createBiquadFilter();lp2.type="lowpass";lp2.frequency.value=5200;lp2.Q.value=.5;
+    // Subtle high-shelf cut at 3kHz for extra warmth (-3dB)
+    const hshelf=ctx.createBiquadFilter();hshelf.type="highshelf";hshelf.frequency.value=3000;hshelf.gain.value=-3;
+    this.master.connect(hshelf);hshelf.connect(lp1);lp1.connect(lp2);lp2.connect(ctx.destination);
+
+    // ── Global pulse (breathing) ──
+    const pulseLfo=ctx.createOscillator();
+    pulseLfo.type="sine";pulseLfo.frequency.value=dna.pulseRate;
+    const pulseGain=ctx.createGain();pulseGain.gain.value=dna.pulseDepth;
+    const pulseOffset=ctx.createGain();pulseOffset.gain.value=1-dna.pulseDepth/2;
+    pulseLfo.connect(pulseGain);
+    // We'll modulate a VCA
+    const pulseVCA=ctx.createGain();
+    pulseVCA.gain.setValueAtTime(1,now);
+    pulseGain.connect(pulseVCA.gain);
+    pulseVCA.connect(this.master);
+    pulseLfo.start();
+    this.nodes.push(pulseLfo);
+
+    // ── Chord voices ──
+    const voiceGainValue=.13/dna.freqRatios.length;
+    dna.freqRatios.forEach((ratio,i)=>{
+      const freq=dna.rootFreq*ratio;
+      const wave=dna.waveSet[i%dna.waveSet.length];
+      const lfoP=dna.voiceLFOs[i];
+
+      const osc=ctx.createOscillator();
+      osc.type=wave;
+      osc.frequency.setValueAtTime(freq,now);
+
+      // Pitch LFO
+      const pitchLfo=ctx.createOscillator();
+      pitchLfo.type="sine";pitchLfo.frequency.value=lfoP.rate;
+      const pitchLfoG=ctx.createGain();pitchLfoG.gain.value=lfoP.freqDepth;
+      pitchLfo.connect(pitchLfoG);pitchLfoG.connect(osc.frequency);
+      pitchLfo.start();
+
+      // Amplitude LFO (each voice breathes independently)
+      const ampLfo=ctx.createOscillator();
+      ampLfo.type="sine";ampLfo.frequency.value=lfoP.ampRate;
+      // Start at different phases by using a delay trick
+      const ampLfoG=ctx.createGain();ampLfoG.gain.value=voiceGainValue*lfoP.ampDepth;
+      ampLfo.connect(ampLfoG);
+
+      const voiceGain=ctx.createGain();
+      voiceGain.gain.setValueAtTime(voiceGainValue*(1-lfoP.ampDepth/2),now);
+      ampLfoG.connect(voiceGain.gain);
+      ampLfo.start(now);
+
+      osc.connect(voiceGain);
+      voiceGain.connect(pulseVCA);
+      osc.start();
+      this.nodes.push(osc,pitchLfo,ampLfo);
+
+      // Slow drift: schedule subtle frequency changes
+      const drift=()=>{
+        if(!this.alive)return;
+        const t=ctx.currentTime;
+        const d=Math.sin(t*dna.driftSpeed*6.28)*dna.driftRange;
+        osc.frequency.setTargetAtTime(freq+d,t,.5);
+      };
+      const driftId=setInterval(drift,800);
+      this.schedulers.push(driftId);
+    });
+
+    // ── Sub bass ──
+    if(dna.subBass>0){
+      const sub=ctx.createOscillator();sub.type="sine";
+      sub.frequency.value=dna.subFreq;
+      const subG=ctx.createGain();subG.gain.value=dna.subBass*.15;
+      // Sub LFO
+      const subLfo=ctx.createOscillator();subLfo.type="sine";subLfo.frequency.value=.04;
+      const subLfoG=ctx.createGain();subLfoG.gain.value=dna.subBass*.04;
+      subLfo.connect(subLfoG);subLfoG.connect(subG.gain);
+      sub.connect(subG);subG.connect(pulseVCA);
+      sub.start();subLfo.start();
+      this.nodes.push(sub,subLfo);
+    }
+
+    // ── Shimmer (high harmonic ghost) ──
+    if(dna.shimmer>0){
+      const shim=ctx.createOscillator();shim.type="sine";
+      shim.frequency.value=Math.min(dna.rootFreq*dna.shimmerRatio,3500);
+      const shimG=ctx.createGain();shimG.gain.value=dna.shimmer;
+      // Slow tremolo on shimmer
+      const shimLfo=ctx.createOscillator();shimLfo.type="sine";shimLfo.frequency.value=.06+Math.random()*.08;
+      const shimLfoG=ctx.createGain();shimLfoG.gain.value=dna.shimmer*.5;
+      shimLfo.connect(shimLfoG);shimLfoG.connect(shimG.gain);
+      shim.connect(shimG);shimG.connect(pulseVCA);
+      shim.start();shimLfo.start();
+      this.nodes.push(shim,shimLfo);
+    }
+
+    // ── Filtered noise texture ──
+    if(dna.noiseAmount>0){
+      const bufSize=ctx.sampleRate*2;
+      const buf=ctx.createBuffer(1,bufSize,ctx.sampleRate);
+      const data=buf.getChannelData(0);
+      for(let i=0;i<bufSize;i++) data[i]=(Math.random()*2-1);
+      const noiseSrc=ctx.createBufferSource();noiseSrc.buffer=buf;noiseSrc.loop=true;
+      // Bandpass filter centered around root
+      const filter=ctx.createBiquadFilter();filter.type="bandpass";
+      filter.frequency.value=dna.rootFreq*2;filter.Q.value=.8;
+      const noiseG=ctx.createGain();noiseG.gain.value=dna.noiseAmount;
+      noiseSrc.connect(filter);filter.connect(noiseG);noiseG.connect(pulseVCA);
+      noiseSrc.start();
+      this.nodes.push(noiseSrc);
+    }
+
+    // ── Binaural layer 1 ──
+    this._addBinaural(dna.bin1carrier,dna.bin1freq,.055,pulseVCA);
+
+    // ── Binaural layer 2 (different frequency band) ──
+    this._addBinaural(dna.bin2carrier,dna.bin2freq,.035,pulseVCA);
+
+    // ── Arpeggiator (slow melodic cycling through chord tones) ──
+    if(dna.arpEnabled){
+      // Reverb-like effect via feedback delay
+      const arpDry=ctx.createGain();arpDry.gain.value=1;
+      const arpWet=ctx.createGain();arpWet.gain.value=.3;
+      const arpDelay=ctx.createDelay(2);arpDelay.delayTime.value=dna.arpInterval*.4;
+      const arpFeedback=ctx.createGain();arpFeedback.gain.value=.25;
+      const arpFilter=ctx.createBiquadFilter();arpFilter.type="lowpass";arpFilter.frequency.value=1200;
+      // Dry path
+      arpDry.connect(pulseVCA);
+      // Wet path: delay → filter → feedback loop → output
+      arpDry.connect(arpDelay);arpDelay.connect(arpFilter);arpFilter.connect(arpWet);
+      arpWet.connect(pulseVCA);arpFilter.connect(arpFeedback);arpFeedback.connect(arpDelay);
+
+      let arpIdx=0;
+      const scheduleArp=()=>{
+        if(!this.alive)return;
+        const t=ctx.currentTime;
+        const st=dna.arpSequence[arpIdx%dna.arpSequence.length];
+        const swing=dna.arpTimingOffsets[arpIdx%dna.arpTimingOffsets.length]*dna.arpSwing*dna.arpInterval;
+        const freq=dna.rootFreq*Math.pow(2,(st+dna.arpOctave*12)/12);
+        arpIdx++;
+
+        // Create a single note with envelope
+        const osc=ctx.createOscillator();
+        osc.type=dna.arpWave;
+        osc.frequency.value=freq;
+        // Slight detune for warmth
+        osc.detune.value=(Math.sin(arpIdx*1.7))*8;
+
+        const env=ctx.createGain();
+        env.gain.setValueAtTime(0,t);
+        env.gain.linearRampToValueAtTime(dna.arpVol,t+dna.arpAttack);
+        env.gain.setValueAtTime(dna.arpVol,t+dna.arpAttack);
+        env.gain.exponentialRampToValueAtTime(.0001,t+dna.arpAttack+dna.arpRelease);
+
+        osc.connect(env);env.connect(arpDry);
+        osc.start(t);
+        osc.stop(t+dna.arpAttack+dna.arpRelease+.1);
+      };
+      // First note after a brief delay
+      const arpFirst=setTimeout(()=>{if(this.alive)scheduleArp()},1500);
+      this.schedulers.push(arpFirst);
+      // Subsequent notes
+      const arpLoop=setInterval(()=>{
+        if(!this.alive)return;
+        scheduleArp();
+      },dna.arpInterval*1000);
+      this.schedulers.push(arpLoop);
+    }
+
+    // ── Bells (occasional high sparkle tones) ──
+    if(dna.bellEnabled){
+      // High-pass to keep bells airy
+      const bellBus=ctx.createGain();bellBus.gain.value=1;
+      const bellHP=ctx.createBiquadFilter();bellHP.type="highpass";bellHP.frequency.value=800;
+      bellBus.connect(bellHP);bellHP.connect(pulseVCA);
+
+      let bellIdx=0;
+      const scheduleBell=()=>{
+        if(!this.alive)return;
+        const t=ctx.currentTime;
+        const st=dna.bellSequence[bellIdx%dna.bellSequence.length];
+        const detune=dna.bellDetunes[bellIdx%dna.bellDetunes.length];
+        const freq=dna.rootFreq*Math.pow(2,(st+dna.bellOctaveShift*12)/12);
+        bellIdx++;
+
+        // Main tone
+        const osc=ctx.createOscillator();
+        osc.type=dna.bellWave;
+        osc.frequency.value=freq;
+        osc.detune.value=detune;
+
+        // Soft harmonic overtone for bell character (capped at 4kHz)
+        const osc2=ctx.createOscillator();
+        osc2.type="sine";
+        osc2.frequency.value=Math.min(freq*2.76,4000);
+        const osc2g=ctx.createGain();osc2g.gain.value=dna.bellVol*.3;
+
+        const env=ctx.createGain();
+        env.gain.setValueAtTime(dna.bellVol,t);
+        env.gain.exponentialRampToValueAtTime(.0001,t+dna.bellDecay);
+
+        const env2=ctx.createGain();
+        env2.gain.setValueAtTime(dna.bellVol*.3,t);
+        env2.gain.exponentialRampToValueAtTime(.0001,t+dna.bellDecay*.6);
+
+        osc.connect(env);env.connect(bellBus);
+        osc2.connect(env2);env2.connect(bellBus);
+        osc.start(t);osc.stop(t+dna.bellDecay+.1);
+        osc2.start(t);osc2.stop(t+dna.bellDecay+.1);
+      };
+      // First bell after a longer delay
+      const bellFirst=setTimeout(()=>{if(this.alive)scheduleBell()},3000+Math.random()*2000);
+      this.schedulers.push(bellFirst);
+      const bellLoop=setInterval(()=>{
+        if(!this.alive)return;
+        scheduleBell();
+      },dna.bellInterval*1000);
+      this.schedulers.push(bellLoop);
+    }
+  }
+
+  _addBinaural(carrier,beatHz,vol,dest){
+    const ctx=this.ctx;
+    const merger=ctx.createChannelMerger(2);
+    const oscL=ctx.createOscillator(),oscR=ctx.createOscillator();
+    oscL.type="sine";oscR.type="sine";
+    oscL.frequency.value=carrier;
+    oscR.frequency.value=carrier+beatHz;
+    const gL=ctx.createGain(),gR=ctx.createGain();
+    gL.gain.value=vol;gR.gain.value=vol;
+    oscL.connect(gL);gL.connect(merger,0,0);
+    oscR.connect(gR);gR.connect(merger,0,1);
+    merger.connect(dest);
+    oscL.start();oscR.start();
+    this.nodes.push(oscL,oscR);
+  }
+
+  stop(){
+    if(!this.ctx||!this.alive)return;this.alive=false;
+    this.schedulers.forEach(id=>{clearInterval(id);clearTimeout(id)});this.schedulers=[];
+    const now=this.ctx.currentTime;
+    this.master.gain.setValueAtTime(this.master.gain.value,now);
+    this.master.gain.linearRampToValueAtTime(0,now+1.5);
+    const ctx=this.ctx,nodes=[...this.nodes];
+    setTimeout(()=>{nodes.forEach(n=>{try{n.stop()}catch(e){}});try{ctx.close()}catch(e){}},1800);
+    this.ctx=null;this.nodes=[];this.master=null;
+  }
+}
+
+// ═══════════════════════════════════════════
+//  CYCLIC FLOW FIELD RENDERER v2
+// ═══════════════════════════════════════════
+function hexToRgb(h){const v=parseInt(h.slice(1),16);return[(v>>16)&255,(v>>8)&255,v&255]}
+
+function initCanvas(canvas,params){
+  const ctx=canvas.getContext("2d");
+  const dpr=window.devicePixelRatio||1;
+  const rect=canvas.getBoundingClientRect();
+  canvas.width=rect.width*dpr;canvas.height=rect.height*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const W=rect.width,H=rect.height;
+  ctx.fillStyle=params.palette.bg;ctx.fillRect(0,0,W,H);
+  return{ctx,W,H};
+}
+
+// Sample noise on a circular path through extra dimension → seamless loop
+function cyclicNoise(perm,x,y,t,loopT,R,octaves){
+  const angle=(t/loopT)*Math.PI*2;
+  const cx=R*Math.cos(angle), cy=R*Math.sin(angle);
+  let val=0,amp=1,freq=1,total=0;
+  for(let o=0;o<octaves;o++){
+    val+=amp*noise2D(perm,(x+cx)*freq,(y+cy)*freq);
+    total+=amp;amp*=.5;freq*=2;
+  }
+  return val/total;
+}
+
+// Apply symmetry transformation: returns array of {x,y} positions to draw
+function applySymmetry(mode,x,y,cx,cy){
+  const dx=x-cx,dy=y-cy;
+  switch(mode){
+    case"mirror_x":return[{x,y},{x:cx-dx,y}];
+    case"mirror_y":return[{x,y},{x,y:cy-dy}];
+    case"radial_2":return[{x,y},{x:cx-dx,y:cy-dy}];
+    case"radial_3":{
+      const pts=[{x,y}];
+      for(let i=1;i<3;i++){
+        const a=i*Math.PI*2/3;
+        pts.push({x:cx+dx*Math.cos(a)-dy*Math.sin(a),y:cy+dx*Math.sin(a)+dy*Math.cos(a)});
+      }
+      return pts;
+    }
+    case"radial_4":{
+      const pts=[{x,y}];
+      for(let i=1;i<4;i++){
+        const a=i*Math.PI/2;
+        pts.push({x:cx+dx*Math.cos(a)-dy*Math.sin(a),y:cy+dx*Math.sin(a)+dy*Math.cos(a)});
+      }
+      return pts;
+    }
+    case"spiral":return[{x,y}]; // spiral handled in angle offset
+    default:return[{x,y}];
+  }
+}
+
+function createFlowRenderer(canvas,params,isPreview){
+  const{ctx,W,H}=initCanvas(canvas,params);
+  const perm=buildPerm(params.seed);
+  const vis=params.visualDNA;
+  const pal=params.palette;
+  const bgRgb=hexToRgb(pal.bg);
+  const colorRgbs=pal.colors.map(hexToRgb);
+  const cx=W/2,cy=H/2;
+  const loopT=vis.loopSeconds;
+  const maxParticles=isPreview?Math.min(vis.numParticles,160):vis.numParticles;
+
+  // Init particles deterministically from spawnData
+  function spawnParticles(){
+    return vis.spawnData.slice(0,maxParticles).map(d=>({
+      homeX:d.rx*W, homeY:d.ry*H,
+      x:d.rx*W, y:d.ry*H,
+      phase:d.phase*loopT,
+      ci:d.ci%pal.colors.length,
+      sizeOff:d.sizeOff,
+      speedOff:d.speedOff,
+      age:d.phase*80,
+    }));
+  }
+
+  let particles=spawnParticles();
+  let time=0;
+  let animId=null;
+
+  function draw(){
+    time+=1/60;
+    const cycleT=time%loopT;
+    const cycleProgress=cycleT/loopT;
+
+    // Trail fade
+    ctx.fillStyle=`rgba(${bgRgb[0]},${bgRgb[1]},${bgRgb[2]},${vis.trailFade})`;
+    ctx.fillRect(0,0,W,H);
+
+    // Pulse scale
+    let pScale=1;
+    if(vis.pulseScale>0){
+      pScale=1+Math.sin(cycleProgress*Math.PI*2)*vis.pulseScale;
+    }
+
+    // Homing force: ramps up in the last 30% of each cycle
+    // Pulls particles smoothly back to home so the loop is seamless
+    const homeStart=.7;
+    const homingStrength=cycleProgress>homeStart
+      ? Math.pow((cycleProgress-homeStart)/(1-homeStart),2) // ease-in quadratic
+      : 0;
+
+    for(const p of particles){
+      // Cyclic noise field
+      const nx=p.x*vis.scale*pScale;
+      const ny=p.y*vis.scale*pScale;
+      let angle=cyclicNoise(perm,nx,ny,cycleT,loopT,vis.noiseRadius,vis.fieldComplexity)*Math.PI*2.5;
+
+      // Spiral twist
+      if(vis.symmetry==="spiral"||vis.spiralTwist!==0){
+        const dist=Math.sqrt((p.x-cx)**2+(p.y-cy)**2);
+        angle+=vis.spiralTwist*dist*.003;
+      }
+
+      const speed=vis.flowSpeed*p.speedOff;
+      // Flow field movement
+      let dx=Math.cos(angle)*speed;
+      let dy=Math.sin(angle)*speed;
+
+      // Blend with homing force
+      if(homingStrength>0){
+        const toHomeX=p.homeX-p.x;
+        const toHomeY=p.homeY-p.y;
+        // Homing speed scales with distance so particles arrive smoothly
+        const homeDist=Math.sqrt(toHomeX*toHomeX+toHomeY*toHomeY);
+        const homeSpeed=Math.max(speed,homeDist*.06);
+        if(homeDist>.5){
+          const hnx=(toHomeX/homeDist)*homeSpeed;
+          const hny=(toHomeY/homeDist)*homeSpeed;
+          dx=dx*(1-homingStrength)+hnx*homingStrength;
+          dy=dy*(1-homingStrength)+hny*homingStrength;
+        }
+      }
+
+      p.x+=dx;
+      p.y+=dy;
+
+      // Constant alpha (no fade in/out — loop is seamless)
+      const alpha=.7;
+
+      // Color
+      let ci=p.ci;
+      if(vis.colorCycle){
+        ci=Math.floor((p.ci+cycleProgress*pal.colors.length))%pal.colors.length;
+      }
+      const c=colorRgbs[ci];
+
+      // Size
+      const size=vis.particleSize*(1-vis.sizeVariance/2+p.sizeOff*vis.sizeVariance);
+
+      // Get draw positions (symmetry)
+      const positions=applySymmetry(vis.symmetry,p.x,p.y,cx,cy);
+
+      // Draw
+      if(vis.glowAmount>0&&alpha>.2){
+        ctx.shadowColor=`rgba(${c[0]},${c[1]},${c[2]},${alpha*vis.glowAmount})`;
+        ctx.shadowBlur=size*3+vis.glowAmount*4;
+      }
+
+      ctx.fillStyle=`rgba(${c[0]},${c[1]},${c[2]},${alpha})`;
+      for(const pt of positions){
+        if(pt.x<-20||pt.x>W+20||pt.y<-20||pt.y>H+20)continue;
+        ctx.beginPath();
+        ctx.arc(pt.x,pt.y,size,0,Math.PI*2);
+        ctx.fill();
+      }
+
+      if(vis.glowAmount>0){ctx.shadowColor="transparent";ctx.shadowBlur=0;}
+
+      // Soft bounds: nudge back if straying too far
+      if(p.x<-30||p.x>W+30||p.y<-30||p.y>H+30){
+        p.x+=(p.homeX-p.x)*.15;
+        p.y+=(p.homeY-p.y)*.15;
+      }
+    }
+    animId=requestAnimationFrame(draw);
+  }
+
+  return{
+    start(){animId=requestAnimationFrame(draw)},
+    stop(){if(animId){cancelAnimationFrame(animId);animId=null}},
+  };
+}
+
+// Session and preview renderers
+let flowRenderer=null, previewRenderer=null;
+
+function startFlowField(canvas,params){
+  stopFlowField();
+  flowRenderer=createFlowRenderer(canvas,params,false);
+  flowRenderer.start();
+}
+function stopFlowField(){if(flowRenderer){flowRenderer.stop();flowRenderer=null}}
+
+function startPreviewFlow(canvas,params){
+  stopPreviewFlow();
+  previewRenderer=createFlowRenderer(canvas,params,true);
+  previewRenderer.start();
+}
+function stopPreviewFlow(){if(previewRenderer){previewRenderer.stop();previewRenderer=null}}
+
+// ═══════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════
+const DURATION=30,TARGET=10;
+let anchorParams=null,sessions=[],currentRating=0,isActivateMode=false;
+let sessionSound=null,previewSound=null,previewPlaying=false;
+let timerInterval=null,timerValue=DURATION;
+
+// Persistence
+const DATA_VERSION=4; // bump this when data format changes
+function saveState(){
+  try{
+    localStorage.setItem("anchor_v",DATA_VERSION);
+    localStorage.setItem("anchor_params",JSON.stringify(anchorParams));
+    localStorage.setItem("anchor_sessions",JSON.stringify(sessions));
+  }catch(e){}
+}
+function loadState(){
+  try{
+    const v=parseInt(localStorage.getItem("anchor_v"))||0;
+    // If data is from an incompatible version, wipe and start fresh
+    if(v<DATA_VERSION){
+      localStorage.removeItem("anchor_params");
+      localStorage.removeItem("anchor_sessions");
+      localStorage.setItem("anchor_v",DATA_VERSION);
+      return;
+    }
+    const p=localStorage.getItem("anchor_params");
+    if(p){
+      const parsed=JSON.parse(p);
+      // Validate essential fields exist
+      if(!parsed||!parsed.seed||!parsed.palette){throw new Error("bad data")}
+      anchorParams=parsed;
+      // Regenerate DNA if missing (shouldn't happen with version check, but safety net)
+      if(!anchorParams.soundDNA) anchorParams.soundDNA=generateSoundDNA(anchorParams.seed);
+      if(!anchorParams.visualDNA) anchorParams.visualDNA=generateVisualDNA(anchorParams.seed);
+    }
+    const s=localStorage.getItem("anchor_sessions");
+    if(s) sessions=JSON.parse(s)||[];
+  }catch(e){
+    // Corrupted data — nuke everything and start clean
+    anchorParams=null;sessions=[];
+    try{localStorage.removeItem("anchor_params");localStorage.removeItem("anchor_sessions")}catch(e2){}
+  }
+}
+
+// ═══════════════════════════════════════════
+//  SCREENS
+// ═══════════════════════════════════════════
+let currentScreen="home";
+function showScreen(name){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  document.getElementById("screen-"+name).classList.add("active");
+  currentScreen=name;
+  if(name==="home") renderHome();
+}
+
+// ═══════════════════════════════════════════
+//  HOME
+// ═══════════════════════════════════════════
+function renderHome(){
+  const hasAnchor=!!anchorParams;
+  document.getElementById("emptyState").style.display=hasAnchor?"none":"flex";
+  document.getElementById("anchorUI").style.display=hasAnchor?"flex":"none";
+  document.getElementById("btnReset").style.display=hasAnchor?"block":"none";
+  if(!hasAnchor)return;
+
+  // Label
+  document.getElementById("anchorLabel").textContent=anchorParams.palette.name+" · #"+anchorParams.seed.toString(16).slice(-6);
+
+  // Preview
+  const pc=document.getElementById("previewCanvas");
+  // Use requestAnimationFrame to ensure DOM is laid out
+  requestAnimationFrame(()=>startPreviewFlow(pc,anchorParams));
+
+  // Progress
+  const reinforce=sessions.filter(s=>s.type==="reinforce");
+  const progress=Math.min(reinforce.length/TARGET,1);
+  const anchored=reinforce.length>=TARGET;
+  document.getElementById("progressLabel").textContent=reinforce.length+"/"+TARGET;
+  const fill=document.getElementById("progressFill");
+  fill.style.width=(progress*100)+"%";
+  fill.className="progress-fill"+(anchored?" done":"");
+  document.getElementById("anchoredBadge").style.display=anchored?"block":"none";
+
+  // Buttons
+  document.getElementById("btnReinforce").textContent=anchored?"Подкрепить якорь":"Сессия закрепления";
+  document.getElementById("btnReinforce").className="btn"+(anchored?" btn-dim":"");
+  document.getElementById("btnActivate").style.display=anchored?"block":"none";
+
+  // History
+  if(sessions.length>0){
+    document.getElementById("historyBlock").style.display="block";
+    const list=document.getElementById("historyList");
+    list.innerHTML="";
+    [...sessions].reverse().forEach(s=>{
+      const row=document.createElement("div");
+      row.style.cssText="display:flex;justify-content:space-between;align-items:center;padding:5px 0";
+      const left=document.createElement("div");
+      left.style.cssText="display:flex;align-items:center";
+      const tag=document.createElement("span");
+      tag.style.cssText="font:400 10px/1 'DM Mono',monospace;margin-right:8px;color:"+(s.type==="activate"?"rgba(0,212,170,.6)":"rgba(255,255,255,.3)");
+      tag.textContent=s.type==="activate"?"ACT":"RNF";
+      const date=document.createElement("span");
+      date.style.cssText="font:400 12px/1 'DM Sans',sans-serif;color:rgba(255,255,255,.4)";
+      date.textContent=new Date(s.date).toLocaleDateString("ru",{day:"numeric",month:"short"});
+      left.append(tag,date);
+      const dots=document.createElement("div");dots.style.cssText="display:flex";
+      for(let i=1;i<=5;i++){const d=document.createElement("div");d.className="hist-dot"+(i<=s.intensity?" on":"");d.style.marginLeft=i>1?"3px":"0";dots.append(d)}
+      row.append(left,dots);list.append(row);
+    });
+  }else{
+    document.getElementById("historyBlock").style.display="none";
+  }
+}
+
+// ═══════════════════════════════════════════
+//  GENERATE ANCHOR
+// ═══════════════════════════════════════════
+function generateAnchor(){
+  stopPreviewSound();
+  showScreen("generating");
+  setTimeout(()=>{
+    const seed=Date.now()^(Math.random()*999999|0);
+    anchorParams=generateAnchorParams(seed);
+    sessions=[];
+    saveState();
+    showScreen("home");
+  },1800);
+}
+
+// ═══════════════════════════════════════════
+//  PREVIEW SOUND
+// ═══════════════════════════════════════════
+function togglePreviewSound(){
+  if(previewPlaying){stopPreviewSound()}
+  else{
+    previewSound=new AnchorSound(anchorParams);
+    previewSound.start();
+    previewPlaying=true;
+    document.getElementById("btnPreviewSound").classList.add("playing");
+    document.getElementById("btnPreviewSound").textContent="◼";
+  }
+}
+function stopPreviewSound(){
+  if(previewSound){previewSound.stop();previewSound=null}
+  previewPlaying=false;
+  const btn=document.getElementById("btnPreviewSound");
+  if(btn){btn.classList.remove("playing");btn.textContent="♪"}
+}
+
+// ═══════════════════════════════════════════
+//  SESSION
+// ═══════════════════════════════════════════
+function startSession(activate){
+  stopPreviewSound();stopPreviewFlow();
+  isActivateMode=activate;
+  timerValue=DURATION;
+  document.getElementById("sessionModeLabel").textContent=activate?"активация":"закрепление";
+  document.getElementById("sessionHint").textContent=activate?"Позволь ощущению заполнить тебя":"Сосредоточься на чувстве спокойствия";
+  document.getElementById("timerText").textContent=DURATION;
+  document.getElementById("timerProgress").style.strokeDashoffset="276.46";
+  showScreen("session");
+
+  // Start canvas after screen is visible so dimensions are correct
+  requestAnimationFrame(()=>{
+    const c=document.getElementById("flowCanvas");
+    startFlowField(c,anchorParams);
+  });
+
+  // Start sound
+  sessionSound=new AnchorSound(anchorParams);
+  sessionSound.start();
+
+  // Timer
+  timerInterval=setInterval(()=>{
+    timerValue--;
+    if(timerValue<=0){
+      clearInterval(timerInterval);timerInterval=null;
+      sessionSound.stop();sessionSound=null;
+      stopFlowField();
+      showRating();
+      return;
+    }
+    document.getElementById("timerText").textContent=timerValue;
+    const progress=(DURATION-timerValue)/DURATION;
+    document.getElementById("timerProgress").style.strokeDashoffset=(276.46*(1-progress)).toFixed(2);
+  },1000);
+}
+
+function cancelSession(){
+  if(timerInterval){clearInterval(timerInterval);timerInterval=null}
+  if(sessionSound){sessionSound.stop();sessionSound=null}
+  stopFlowField();
+  showScreen("home");
+}
+
+// ═══════════════════════════════════════════
+//  RATING
+// ═══════════════════════════════════════════
+function showRating(){
+  currentRating=0;
+  document.getElementById("ratingQuestion").textContent=
+    isActivateMode?"Ты почувствовал(а) сдвиг в состоянии?":"Насколько интенсивным было чувство спокойствия?";
+  const row=document.getElementById("ratingRow");
+  row.innerHTML="";
+  for(let i=1;i<=5;i++){
+    const btn=document.createElement("button");
+    btn.className="rating-dot";btn.textContent=i;
+    (function(val){btn.addEventListener("click",function(){setRating(val)})})(i);
+    row.append(btn);
+  }
+  const save=document.getElementById("btnSaveRating");
+  save.style.opacity=".3";save.style.pointerEvents="none";
+  showScreen("rating");
+}
+
+function setRating(n){
+  currentRating=n;
+  document.querySelectorAll(".rating-dot").forEach((d,i)=>{
+    d.classList.toggle("on",i<n);
+  });
+  const save=document.getElementById("btnSaveRating");
+  save.style.opacity="1";save.style.pointerEvents="auto";
+  save.className="btn";
+}
+
+function saveRating(){
+  if(!currentRating)return;
+  sessions.push({date:new Date().toISOString(),intensity:currentRating,type:isActivateMode?"activate":"reinforce"});
+  saveState();
+  showScreen("home");
+}
+
+// ═══════════════════════════════════════════
+//  RESET
+// ═══════════════════════════════════════════
+function resetAll(){
+  if(!confirm("Сбросить якорь и все данные?"))return;
+  stopPreviewSound();stopPreviewFlow();
+  anchorParams=null;sessions=[];
+  try{localStorage.removeItem("anchor_params");localStorage.removeItem("anchor_sessions")}catch(e){}
+  showScreen("home");
+}
+
+// ═══════════════════════════════════════════
+//  SERVICE WORKER (inline, for PWA install)
+// ═══════════════════════════════════════════
+if("serviceWorker" in navigator){
+  const swCode=`self.addEventListener("install",e=>self.skipWaiting());self.addEventListener("activate",e=>self.clients.claim());self.addEventListener("fetch",e=>e.respondWith(fetch(e.request).catch(()=>new Response("Offline",{status:503}))));`;
+  const blob=new Blob([swCode],{type:"application/javascript"});
+  navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(()=>{});
+}
+
+// ═══════════════════════════════════════════
+//  INIT — addEventListener instead of inline onclick
+// ═══════════════════════════════════════════
+function bind(id,fn){
+  const el=document.getElementById(id);
+  if(!el)return;
+  let lastFire=0;
+  function safeFire(){
+    var now=Date.now();
+    if(now-lastFire<400)return; // debounce 400ms
+    lastFire=now;
+    fn();
+  }
+  // Primary: click (works everywhere, no 300ms delay because we set touch-action:manipulation)
+  el.addEventListener("click",safeFire);
+  // Fallback: pointerup (Samsung Internet ≥12, covers edge cases where click is swallowed)
+  if(window.PointerEvent){
+    el.addEventListener("pointerup",function(e){
+      // Only fire for primary button, and only if pointer stayed on the element
+      if(e.button!==0)return;
+      safeFire();
+    });
+  }
+}
+
+try{
+  loadState();
+}catch(e){
+  anchorParams=null;sessions=[];
+  try{localStorage.clear()}catch(e2){}
+}
+
+bind("btnStart",function(){showScreen("onboarding")});
+bind("btnReset",resetAll);
+bind("btnPreviewSound",togglePreviewSound);
+bind("btnReinforce",function(){startSession(false)});
+bind("btnActivate",function(){startSession(true)});
+bind("btnRegenerate",generateAnchor);
+bind("btnOnboardGenerate",generateAnchor);
+bind("btnCancelSession",cancelSession);
+bind("btnSaveRating",saveRating);
+
+try{
+  renderHome();
+}catch(e){
+  // If renderHome fails, at least show empty state
+  anchorParams=null;sessions=[];
+  try{localStorage.clear()}catch(e2){}
+  renderHome();
+}
+</script>
+</body>
+</html>
