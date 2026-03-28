@@ -212,15 +212,82 @@ canvas#flowCanvas{position:absolute;top:0;left:0;width:100%;height:100%}
 
 </div>
 
+<!-- BOOTSTRAP: Pure ES5, cannot fail. Handles navigation even if main script crashes -->
 <script>
-// Global error handler: if any JS error occurs, ensure buttons still work
-window.onerror=function(msg,url,line){
-  try{console.error("Anchor error:",msg,"at line",line);
-    // If data is corrupt, clear it so app can start fresh on reload
-    if(msg&&(msg.indexOf("Cannot read")>-1||msg.indexOf("undefined")>-1||msg.indexOf("null")>-1)){
-      localStorage.removeItem("anchor_params");localStorage.removeItem("anchor_sessions");
+(function(){
+  "use strict";
+  // Screen navigation
+  window.showScreen = function(name) {
+    var screens = document.querySelectorAll(".screen");
+    for (var i = 0; i < screens.length; i++) {
+      screens[i].classList.remove("active");
     }
-  }catch(e){}
+    var target = document.getElementById("screen-" + name);
+    if (target) target.classList.add("active");
+    // Hook for main script to do extra work on screen change
+    if (typeof window._onScreen === "function") {
+      try { window._onScreen(name); } catch(e) {}
+    }
+  };
+
+  // Bind click to element by ID
+  function tap(id, fn) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener("click", fn);
+  }
+
+  // Bind all navigation buttons
+  tap("btnStart", function() { showScreen("onboarding"); });
+  tap("btnOnboardGenerate", function() {
+    if (typeof window.generateAnchor === "function") {
+      window.generateAnchor();
+    } else {
+      showScreen("generating");
+      setTimeout(function() { showScreen("home"); }, 2000);
+    }
+  });
+  tap("btnCancelSession", function() {
+    if (typeof window.cancelSession === "function") {
+      window.cancelSession();
+    } else {
+      showScreen("home");
+    }
+  });
+  tap("btnReset", function() {
+    if (typeof window.resetAll === "function") {
+      window.resetAll();
+    } else {
+      try { localStorage.clear(); } catch(e) {}
+      location.reload();
+    }
+  });
+  tap("btnReinforce", function() {
+    if (typeof window.startSession === "function") window.startSession(false);
+  });
+  tap("btnActivate", function() {
+    if (typeof window.startSession === "function") window.startSession(true);
+  });
+  tap("btnPreviewSound", function() {
+    if (typeof window.togglePreviewSound === "function") window.togglePreviewSound();
+  });
+  tap("btnRegenerate", function() {
+    if (typeof window.generateAnchor === "function") window.generateAnchor();
+  });
+  tap("btnSaveRating", function() {
+    if (typeof window.saveRating === "function") window.saveRating();
+  });
+
+  // Debug: make the bootstrap status visible (remove in production)
+  // document.title = "Anchor [JS OK]";
+})();
+</script>
+
+<!-- MAIN: Audio, visual, logic. If this fails, navigation still works -->
+<script>
+// Global error handler
+window.onerror=function(msg,url,line){
+  try{console.error("Anchor error:",msg,"at line",line)}catch(e){}
 };
 // ═══════════════════════════════════════════
 //  SIMPLEX NOISE
@@ -352,36 +419,47 @@ function generateSoundDNA(seed){
   // ── Melodic layers ──
 
   // Arpeggiator: slow cycling through chord tones
-  const arpEnabled=true; // always on for melodicity
-  const arpInterval=2.5+r()*4; // seconds between notes (2.5-6.5s → very slow)
-  const arpAttack=.8+r()*1.5; // long fade-in (0.8-2.3s)
-  const arpRelease=1.5+r()*2.5; // long fade-out (1.5-4s)
-  const arpVol=.04+r()*.04; // gentle (0.04-0.08)
-  const arpOctave=r()>.5?1:2; // play 1 or 2 octaves above root
+  const arpEnabled=true;
+  const arpInterval=1.8+r()*2.5; // faster: 1.8-4.3s between notes
+  const arpAttack=.5+r()*1; // 0.5-1.5s
+  const arpRelease=1.2+r()*2; // 1.2-3.2s
+  const arpVol=.06+r()*.05; // louder: 0.06-0.11
+  const arpOctave=r()>.5?1:2;
   const arpWave=r()>.6?"triangle":"sine";
-  // Build a deterministic note sequence from chord tones
   const arpSequence=[];
   for(let i=0;i<16;i++){
     arpSequence.push(chordTones[Math.floor(r()*chordTones.length)]);
   }
-  // Slight humanization: per-note timing offset
-  const arpSwing=.05+r()*.2; // 0-1, fraction of interval for timing jitter
-  const arpTimingOffsets=arpSequence.map(()=>(r()-.5)*2); // -1..1, multiplied by swing
+  const arpSwing=.05+r()*.2;
+  const arpTimingOffsets=arpSequence.map(()=>(r()-.5)*2);
+
+  // Melodic motifs: short 2-4 note phrases that repeat
+  const motifEnabled=true;
+  const motifLength=2+Math.floor(r()*3); // 2-4 notes per phrase
+  const motifNotes=[];
+  for(let i=0;i<motifLength;i++){
+    motifNotes.push(scale[Math.floor(r()*scale.length)]+12); // one octave up
+  }
+  const motifNoteInterval=.6+r()*1; // 0.6-1.6s between notes in phrase
+  const motifPauseAfter=3+r()*5; // 3-8s pause between phrases
+  const motifVol=.05+r()*.04; // 0.05-0.09
+  const motifAttack=.3+r()*.5;
+  const motifRelease=.8+r()*1.5;
+  const motifOctave=r()>.5?1:2;
+  const motifWave=r()>.5?"sine":"triangle";
 
   // Bells: occasional high sparkle tones
-  const bellEnabled=r()>.15; // ~85% chance
-  const bellInterval=4+r()*6; // seconds between bells (4-10s)
-  const bellDecay=1+r()*2; // exponential decay time (1-3s)
-  const bellVol=.02+r()*.03; // very quiet (0.02-0.05)
-  const bellOctaveShift=2+Math.floor(r()*2); // 2-3 octaves above root
+  const bellEnabled=r()>.1; // ~90% chance
+  const bellInterval=3+r()*4; // slightly more frequent: 3-7s
+  const bellDecay=1+r()*2;
+  const bellVol=.03+r()*.03; // louder: 0.03-0.06
+  const bellOctaveShift=2+Math.floor(r()*2);
   const bellWave="sine";
-  // Bell note sequence from full scale
   const bellSequence=[];
   for(let i=0;i<12;i++){
     bellSequence.push(scale[Math.floor(r()*scale.length)]);
   }
-  // Some bells get a soft detune for shimmer
-  const bellDetunes=bellSequence.map(()=>(r()-.5)*6); // ±3 cents
+  const bellDetunes=bellSequence.map(()=>(r()-.5)*6);
 
   return{
     rootFreq,scaleIdx,freqRatios,chordTones,scale,waveSet,
@@ -392,6 +470,8 @@ function generateSoundDNA(seed){
     noiseAmount,pulseRate,pulseDepth,
     arpEnabled,arpInterval,arpAttack,arpRelease,arpVol,arpOctave,arpWave,
     arpSequence,arpSwing,arpTimingOffsets,
+    motifEnabled,motifNotes,motifNoteInterval,motifPauseAfter,
+    motifVol,motifAttack,motifRelease,motifOctave,motifWave,
     bellEnabled,bellInterval,bellDecay,bellVol,bellOctaveShift,bellWave,
     bellSequence,bellDetunes
   };
@@ -400,7 +480,7 @@ function generateSoundDNA(seed){
 // ═══════════════════════════════════════════
 //  VISUAL DNA (generated from seed)
 // ═══════════════════════════════════════════
-const SYMMETRY_MODES=["none","mirror_x","mirror_y","radial_2","radial_3","radial_4","spiral"];
+const SYMMETRY_MODES=["mirror_x","mirror_y","radial_2","radial_3","radial_4","spiral"];
 
 function generateVisualDNA(seed){
   let s=seed^0xDEAD;
@@ -408,26 +488,35 @@ function generateVisualDNA(seed){
 
   const symmetry=SYMMETRY_MODES[Math.floor(r()*SYMMETRY_MODES.length)];
   const loopSeconds=6+Math.floor(r()*5); // 6-10 sec cycle
-  const noiseRadius=.3+r()*.6; // how much field changes over cycle
-  const scale=.002+r()*.005;
-  const flowSpeed=.3+r()*.6;
-  const numParticles=180+Math.floor(r()*180); // 180-360
-  const trailFade=.025+r()*.055; // lower = longer trails
-  const particleSize=.8+r()*1.8;
-  const sizeVariance=r()*.6; // 0 = uniform, .6 = very varied
-  const colorCycle=r()>.5; // particles shift color over lifetime
-  const glowAmount=r()>.4?(.3+r()*.7):0; // soft glow on particles
-  const spiralTwist=r()*2-1; // -1 to 1, affects flow angle offset
-  const fieldComplexity=1+Math.floor(r()*3); // 1-3 octaves of noise
-  const pulseScale=r()>.4?(.02+r()*.04):0; // breathing scale pulse
+  const noiseRadius=.3+r()*.5;
+  const scale=.003+r()*.005;
+  const flowSpeed=.2+r()*.4; // slower for calmer movement
+  const numParticles=40+Math.floor(r()*50); // 40-90: fewer, more distinct
+  const trailFade=.012+r()*.025; // much slower fade = longer elegant trails
+  const particleSize=2+r()*3.5; // 2-5.5px: large, visible
+  const sizeVariance=.1+r()*.3;
+  const colorCycle=r()>.4;
+  const glowAmount=.5+r()*.8; // always glow, 0.5-1.3
+  const spiralTwist=(r()-.5)*1.5;
+  const fieldComplexity=1+Math.floor(r()*2); // 1-2 octaves: simpler = more coherent flow
+  const pulseScale=.02+r()*.04; // always breathe
 
-  // Deterministic initial positions (seeded PRNG, not Math.random)
+  // Spawn from center region (not full canvas) for focal coherence
   let ps=seed^0xBEEF;
   const rp=()=>{ps=(ps*48271+1)%2147483647;return ps/2147483647};
-  const spawnData=Array.from({length:numParticles},()=>({
-    rx:rp(),ry:rp(),phase:rp(),ci:Math.floor(rp()*4),
-    sizeOff:rp(),speedOff:.7+rp()*.6
-  }));
+  const spawnData=Array.from({length:numParticles},()=>{
+    // Gaussian-ish distribution around center
+    const angle=rp()*Math.PI*2;
+    const dist=.15+rp()*.35; // 15-50% from center
+    return{
+      rx:.5+Math.cos(angle)*dist,
+      ry:.5+Math.sin(angle)*dist,
+      phase:rp(),
+      ci:Math.floor(rp()*4),
+      sizeOff:rp(),
+      speedOff:.7+rp()*.6
+    };
+  });
 
   return{symmetry,loopSeconds,noiseRadius,scale,flowSpeed,numParticles,
     trailFade,particleSize,sizeVariance,colorCycle,glowAmount,
@@ -681,6 +770,56 @@ class AnchorSound{
       },dna.bellInterval*1000);
       this.schedulers.push(bellLoop);
     }
+
+    // ── Melodic motifs (short repeating phrases) ──
+    if(dna.motifEnabled){
+      const motifBus=ctx.createGain();motifBus.gain.value=1;
+      // Soft delay for space
+      const motifDelay=ctx.createDelay(2);motifDelay.delayTime.value=.4;
+      const motifDelayG=ctx.createGain();motifDelayG.gain.value=.2;
+      const motifDelayFilter=ctx.createBiquadFilter();motifDelayFilter.type="lowpass";motifDelayFilter.frequency.value=2000;
+      motifBus.connect(pulseVCA);
+      motifBus.connect(motifDelay);motifDelay.connect(motifDelayFilter);motifDelayFilter.connect(motifDelayG);
+      motifDelayG.connect(pulseVCA);
+
+      let motifNoteIdx=0;
+      const playMotifPhrase=()=>{
+        if(!this.alive)return;
+        // Play each note in the motif sequentially
+        for(let n=0;n<dna.motifNotes.length;n++){
+          const noteDelay=n*dna.motifNoteInterval;
+          const playNote=()=>{
+            if(!this.alive)return;
+            const t=ctx.currentTime;
+            const st=dna.motifNotes[motifNoteIdx%dna.motifNotes.length];
+            const freq=dna.rootFreq*Math.pow(2,(st+dna.motifOctave*12)/12);
+            motifNoteIdx++;
+            const osc=ctx.createOscillator();
+            osc.type=dna.motifWave;
+            osc.frequency.value=freq;
+            osc.detune.value=(Math.sin(motifNoteIdx*2.3))*5;
+            const env=ctx.createGain();
+            env.gain.setValueAtTime(0,t);
+            env.gain.linearRampToValueAtTime(dna.motifVol,t+dna.motifAttack);
+            env.gain.setValueAtTime(dna.motifVol,t+dna.motifAttack);
+            env.gain.exponentialRampToValueAtTime(.0001,t+dna.motifAttack+dna.motifRelease);
+            osc.connect(env);env.connect(motifBus);
+            osc.start(t);osc.stop(t+dna.motifAttack+dna.motifRelease+.1);
+          };
+          const tid=setTimeout(playNote,noteDelay*1000);
+          this.schedulers.push(tid);
+        }
+      };
+      // Total phrase duration + pause
+      const phraseCycle=(dna.motifNotes.length*dna.motifNoteInterval+dna.motifPauseAfter)*1000;
+      const motifFirst=setTimeout(()=>{if(this.alive)playMotifPhrase()},2500);
+      this.schedulers.push(motifFirst);
+      const motifLoop=setInterval(()=>{
+        if(!this.alive)return;
+        playMotifPhrase();
+      },phraseCycle);
+      this.schedulers.push(motifLoop);
+    }
   }
 
   _addBinaural(carrier,beatHz,vol,dest){
@@ -776,7 +915,7 @@ function createFlowRenderer(canvas,params,isPreview){
   const colorRgbs=pal.colors.map(hexToRgb);
   const cx=W/2,cy=H/2;
   const loopT=vis.loopSeconds;
-  const maxParticles=isPreview?Math.min(vis.numParticles,160):vis.numParticles;
+  const maxParticles=isPreview?Math.min(vis.numParticles,60):vis.numParticles;
 
   // Init particles deterministically from spawnData
   function spawnParticles(){
@@ -833,6 +972,17 @@ function createFlowRenderer(canvas,params,isPreview){
       // Flow field movement
       let dx=Math.cos(angle)*speed;
       let dy=Math.sin(angle)*speed;
+
+      // Center gravity: gentle pull towards center keeps the pattern cohesive
+      const toCx=cx-p.x, toCy=cy-p.y;
+      const centerDist=Math.sqrt(toCx*toCx+toCy*toCy);
+      const maxDist=Math.min(W,H)*.45;
+      if(centerDist>maxDist*.3){
+        // Force grows with distance from center
+        const gravity=.02*Math.pow(centerDist/maxDist,2);
+        dx+=toCx/centerDist*gravity;
+        dy+=toCy/centerDist*gravity;
+      }
 
       // Blend with homing force
       if(homingStrength>0){
@@ -925,7 +1075,7 @@ let sessionSound=null,previewSound=null,previewPlaying=false;
 let timerInterval=null,timerValue=DURATION;
 
 // Persistence
-const DATA_VERSION=4; // bump this when data format changes
+const DATA_VERSION=6; // bump this when data format changes
 function saveState(){
   try{
     localStorage.setItem("anchor_v",DATA_VERSION);
@@ -963,15 +1113,13 @@ function loadState(){
 }
 
 // ═══════════════════════════════════════════
-//  SCREENS
+//  SCREENS (augments bootstrap showScreen via hook)
 // ═══════════════════════════════════════════
 let currentScreen="home";
-function showScreen(name){
-  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
-  document.getElementById("screen-"+name).classList.add("active");
+window._onScreen=function(name){
   currentScreen=name;
   if(name==="home") renderHome();
-}
+};
 
 // ═══════════════════════════════════════════
 //  HOME
@@ -1154,7 +1302,6 @@ function saveRating(){
 //  RESET
 // ═══════════════════════════════════════════
 function resetAll(){
-  if(!confirm("Сбросить якорь и все данные?"))return;
   stopPreviewSound();stopPreviewFlow();
   anchorParams=null;sessions=[];
   try{localStorage.removeItem("anchor_params");localStorage.removeItem("anchor_sessions")}catch(e){}
@@ -1162,38 +1309,14 @@ function resetAll(){
 }
 
 // ═══════════════════════════════════════════
-//  SERVICE WORKER (inline, for PWA install)
+//  INIT — expose functions to window for bootstrap script
 // ═══════════════════════════════════════════
-if("serviceWorker" in navigator){
-  const swCode=`self.addEventListener("install",e=>self.skipWaiting());self.addEventListener("activate",e=>self.clients.claim());self.addEventListener("fetch",e=>e.respondWith(fetch(e.request).catch(()=>new Response("Offline",{status:503}))));`;
-  const blob=new Blob([swCode],{type:"application/javascript"});
-  navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(()=>{});
-}
-
-// ═══════════════════════════════════════════
-//  INIT — addEventListener instead of inline onclick
-// ═══════════════════════════════════════════
-function bind(id,fn){
-  const el=document.getElementById(id);
-  if(!el)return;
-  let lastFire=0;
-  function safeFire(){
-    var now=Date.now();
-    if(now-lastFire<400)return; // debounce 400ms
-    lastFire=now;
-    fn();
-  }
-  // Primary: click (works everywhere, no 300ms delay because we set touch-action:manipulation)
-  el.addEventListener("click",safeFire);
-  // Fallback: pointerup (Samsung Internet ≥12, covers edge cases where click is swallowed)
-  if(window.PointerEvent){
-    el.addEventListener("pointerup",function(e){
-      // Only fire for primary button, and only if pointer stayed on the element
-      if(e.button!==0)return;
-      safeFire();
-    });
-  }
-}
+window.generateAnchor=generateAnchor;
+window.startSession=startSession;
+window.cancelSession=cancelSession;
+window.togglePreviewSound=togglePreviewSound;
+window.resetAll=resetAll;
+window.saveRating=saveRating;
 
 try{
   loadState();
@@ -1202,23 +1325,12 @@ try{
   try{localStorage.clear()}catch(e2){}
 }
 
-bind("btnStart",function(){showScreen("onboarding")});
-bind("btnReset",resetAll);
-bind("btnPreviewSound",togglePreviewSound);
-bind("btnReinforce",function(){startSession(false)});
-bind("btnActivate",function(){startSession(true)});
-bind("btnRegenerate",generateAnchor);
-bind("btnOnboardGenerate",generateAnchor);
-bind("btnCancelSession",cancelSession);
-bind("btnSaveRating",saveRating);
-
 try{
   renderHome();
 }catch(e){
-  // If renderHome fails, at least show empty state
   anchorParams=null;sessions=[];
   try{localStorage.clear()}catch(e2){}
-  renderHome();
+  try{renderHome()}catch(e3){}
 }
 </script>
 </body>
