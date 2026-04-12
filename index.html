@@ -241,13 +241,14 @@ canvas#flowCanvas{position:absolute;top:0;left:0;width:100%;height:100%}
   };
   window._anchorData = null;
   function createBasicAnchor() {
-    var seed = Date.now() ^ (Math.random() * 999999 | 0);
+    var seed = (Date.now() ^ (Math.random() * 999999 | 0)) >>> 0;
     var pals = ["aurora","ember","ocean","forest","nebula","arctic","copper","sakura","moss","storm","mars","deep","gold","coral"];
     var s = seed;
-    var idx = Math.floor(((s = (s * 16807 + 11) % 2147483647) / 2147483647) * pals.length);
-    window._anchorData = { seed: seed, paletteName: pals[idx], created: true };
+    var idx = Math.floor((Math.abs((s * 16807 + 11) % 2147483647) / 2147483647) * pals.length);
+    window._anchorData = { seed: seed, paletteName: pals[idx] || "aurora", created: true };
     try { localStorage.setItem("anchor_basic", JSON.stringify(window._anchorData)); } catch(e) {}
   }
+  window._createBasicAnchor = createBasicAnchor;
   try {
     var saved = localStorage.getItem("anchor_basic");
     if (saved) window._anchorData = JSON.parse(saved);
@@ -1160,29 +1161,32 @@ window._onScreen=function(name){
 // ═══════════════════════════════════════════
 function renderHome(){
   try{
-  const hasAnchor=!!anchorParams;
+  const hasAnchor=!!anchorParams||!!(window._anchorData&&window._anchorData.created);
   document.getElementById("emptyState").style.display=hasAnchor?"none":"flex";
   document.getElementById("anchorUI").style.display=hasAnchor?"flex":"none";
   document.getElementById("btnReset").style.display=hasAnchor?"block":"none";
   if(!hasAnchor)return;
 
-  // Label
-  document.getElementById("anchorLabel").textContent=(anchorParams.palette?anchorParams.palette.name:"anchor")+" · #"+(anchorParams.seed||0).toString(16).slice(-6);
+  // Label — use bootstrap data as fallback
+  var palName=anchorParams&&anchorParams.palette?anchorParams.palette.name:(window._anchorData?window._anchorData.paletteName:"anchor");
+  var seedVal=anchorParams?anchorParams.seed:(window._anchorData?window._anchorData.seed:0);
+  document.getElementById("anchorLabel").textContent=palName+" · #"+(seedVal||0).toString(16).slice(-6);
 
-  // Preview — double rAF to ensure layout has settled after display:none→flex
+  // Preview — only if we have full anchor data with visualDNA
   const pc=document.getElementById("previewCanvas");
   stopPreviewFlow();
-  requestAnimationFrame(function(){requestAnimationFrame(function(){
-    try{
-      var rect=pc.getBoundingClientRect();
-      if(rect.width>0&&rect.height>0){
-        startPreviewFlow(pc,anchorParams);
-      }else{
-        // Canvas still has no size — retry once more after 100ms
-        setTimeout(function(){try{startPreviewFlow(pc,anchorParams)}catch(e){}},100);
-      }
-    }catch(e){}
-  })});
+  if(anchorParams&&anchorParams.visualDNA){
+    requestAnimationFrame(function(){requestAnimationFrame(function(){
+      try{
+        var rect=pc.getBoundingClientRect();
+        if(rect.width>0&&rect.height>0){
+          startPreviewFlow(pc,anchorParams);
+        }else{
+          setTimeout(function(){try{startPreviewFlow(pc,anchorParams)}catch(e){}},100);
+        }
+      }catch(e){}
+    })});
+  }
 
   // Progress
   const reinforce=sessions.filter(s=>s.type==="reinforce");
@@ -1234,15 +1238,27 @@ function generateAnchor(){
   try{stopPreviewFlow()}catch(e){}
   showScreen("generating");
   setTimeout(function(){
+    // Try full generation
     try{
-      var seed=(Date.now()^(Math.random()*999999|0))>>>0; // >>> 0 forces unsigned 32-bit
+      var seed=(Date.now()^(Math.random()*999999|0))>>>0;
       anchorParams=generateAnchorParams(seed);
       sessions=[];
       saveState();
     }catch(e){
-      anchorParams=null;sessions=[];
-      if(typeof window._showError==="function") window._showError("generateAnchor: "+e.message);
-      try{console.error("generateAnchor error:",e)}catch(e2){}
+      if(typeof window._showError==="function") window._showError("gen1: "+e.message);
+      // Fallback: try with simple seed
+      try{
+        anchorParams=generateAnchorParams(42);
+        sessions=[];
+        saveState();
+      }catch(e2){
+        if(typeof window._showError==="function") window._showError("gen2: "+e2.message);
+        anchorParams=null;
+      }
+    }
+    // If all generation failed, use bootstrap's basic anchor for UI
+    if(!anchorParams && typeof window._createBasicAnchor==="function"){
+      window._createBasicAnchor();
     }
     showScreen("home");
   },1800);
