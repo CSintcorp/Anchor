@@ -8,6 +8,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <title>Anchor</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiQW5jaG9yIiwic2hvcnRfbmFtZSI6IkFuY2hvciIsInN0YXJ0X3VybCI6Ii4iLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImJhY2tncm91bmRfY29sb3IiOiIjMDgwOTBlIiwidGhlbWVfY29sb3IiOiIjMDgwOTBlIn0=">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -240,12 +243,19 @@ canvas#flowCanvas{position:absolute;top:0;left:0;width:100%;height:100%}
   // Bind all navigation buttons
   tap("btnStart", function() { showScreen("onboarding"); });
   tap("btnOnboardGenerate", function() {
+    showScreen("generating");
     if (typeof window.generateAnchor === "function") {
-      window.generateAnchor();
+      try { window.generateAnchor(); } catch(e) {
+        setTimeout(function() { showScreen("home"); }, 2000);
+      }
     } else {
-      showScreen("generating");
       setTimeout(function() { showScreen("home"); }, 2000);
     }
+    // Safety net: if still on generating after 3s, force home
+    setTimeout(function() {
+      var gen = document.getElementById("screen-generating");
+      if (gen && gen.classList.contains("active")) showScreen("home");
+    }, 3000);
   });
   tap("btnCancelSession", function() {
     if (typeof window.cancelSession === "function") {
@@ -272,7 +282,14 @@ canvas#flowCanvas{position:absolute;top:0;left:0;width:100%;height:100%}
     if (typeof window.togglePreviewSound === "function") window.togglePreviewSound();
   });
   tap("btnRegenerate", function() {
-    if (typeof window.generateAnchor === "function") window.generateAnchor();
+    showScreen("generating");
+    if (typeof window.generateAnchor === "function") {
+      try { window.generateAnchor(); } catch(e) {}
+    }
+    setTimeout(function() {
+      var gen = document.getElementById("screen-generating");
+      if (gen && gen.classList.contains("active")) showScreen("home");
+    }, 3000);
   });
   tap("btnSaveRating", function() {
     if (typeof window.saveRating === "function") window.saveRating();
@@ -1125,6 +1142,7 @@ window._onScreen=function(name){
 //  HOME
 // ═══════════════════════════════════════════
 function renderHome(){
+  try{
   const hasAnchor=!!anchorParams;
   document.getElementById("emptyState").style.display=hasAnchor?"none":"flex";
   document.getElementById("anchorUI").style.display=hasAnchor?"flex":"none";
@@ -1134,10 +1152,20 @@ function renderHome(){
   // Label
   document.getElementById("anchorLabel").textContent=anchorParams.palette.name+" · #"+anchorParams.seed.toString(16).slice(-6);
 
-  // Preview
+  // Preview — double rAF to ensure layout has settled after display:none→flex
   const pc=document.getElementById("previewCanvas");
-  // Use requestAnimationFrame to ensure DOM is laid out
-  requestAnimationFrame(()=>startPreviewFlow(pc,anchorParams));
+  stopPreviewFlow();
+  requestAnimationFrame(function(){requestAnimationFrame(function(){
+    try{
+      var rect=pc.getBoundingClientRect();
+      if(rect.width>0&&rect.height>0){
+        startPreviewFlow(pc,anchorParams);
+      }else{
+        // Canvas still has no size — retry once more after 100ms
+        setTimeout(function(){try{startPreviewFlow(pc,anchorParams)}catch(e){}},100);
+      }
+    }catch(e){}
+  })});
 
   // Progress
   const reinforce=sessions.filter(s=>s.type==="reinforce");
@@ -1178,19 +1206,26 @@ function renderHome(){
   }else{
     document.getElementById("historyBlock").style.display="none";
   }
+  }catch(e){try{console.error("renderHome error:",e)}catch(e2){}}
 }
 
 // ═══════════════════════════════════════════
 //  GENERATE ANCHOR
 // ═══════════════════════════════════════════
 function generateAnchor(){
-  stopPreviewSound();
+  try{stopPreviewSound()}catch(e){}
+  try{stopPreviewFlow()}catch(e){}
   showScreen("generating");
-  setTimeout(()=>{
-    const seed=Date.now()^(Math.random()*999999|0);
-    anchorParams=generateAnchorParams(seed);
-    sessions=[];
-    saveState();
+  setTimeout(function(){
+    try{
+      var seed=Date.now()^(Math.random()*999999|0);
+      anchorParams=generateAnchorParams(seed);
+      sessions=[];
+      saveState();
+    }catch(e){
+      anchorParams=null;sessions=[];
+      try{console.error("generateAnchor error:",e)}catch(e2){}
+    }
     showScreen("home");
   },1800);
 }
@@ -1219,7 +1254,8 @@ function stopPreviewSound(){
 //  SESSION
 // ═══════════════════════════════════════════
 function startSession(activate){
-  stopPreviewSound();stopPreviewFlow();
+  try{stopPreviewSound()}catch(e){}
+  try{stopPreviewFlow()}catch(e){}
   isActivateMode=activate;
   timerValue=DURATION;
   document.getElementById("sessionModeLabel").textContent=activate?"активация":"закрепление";
@@ -1229,35 +1265,39 @@ function startSession(activate){
   showScreen("session");
 
   // Start canvas after screen is visible so dimensions are correct
-  requestAnimationFrame(()=>{
-    const c=document.getElementById("flowCanvas");
-    startFlowField(c,anchorParams);
+  requestAnimationFrame(function(){
+    try{
+      var c=document.getElementById("flowCanvas");
+      startFlowField(c,anchorParams);
+    }catch(e){}
   });
 
   // Start sound
-  sessionSound=new AnchorSound(anchorParams);
-  sessionSound.start();
+  try{
+    sessionSound=new AnchorSound(anchorParams);
+    sessionSound.start();
+  }catch(e){}
 
   // Timer
-  timerInterval=setInterval(()=>{
+  timerInterval=setInterval(function(){
     timerValue--;
     if(timerValue<=0){
       clearInterval(timerInterval);timerInterval=null;
-      sessionSound.stop();sessionSound=null;
-      stopFlowField();
+      try{if(sessionSound){sessionSound.stop();sessionSound=null}}catch(e){}
+      try{stopFlowField()}catch(e){}
       showRating();
       return;
     }
     document.getElementById("timerText").textContent=timerValue;
-    const progress=(DURATION-timerValue)/DURATION;
+    var progress=(DURATION-timerValue)/DURATION;
     document.getElementById("timerProgress").style.strokeDashoffset=(276.46*(1-progress)).toFixed(2);
   },1000);
 }
 
 function cancelSession(){
-  if(timerInterval){clearInterval(timerInterval);timerInterval=null}
-  if(sessionSound){sessionSound.stop();sessionSound=null}
-  stopFlowField();
+  try{if(timerInterval){clearInterval(timerInterval);timerInterval=null}}catch(e){}
+  try{if(sessionSound){sessionSound.stop();sessionSound=null}}catch(e){}
+  try{stopFlowField()}catch(e){}
   showScreen("home");
 }
 
@@ -1302,7 +1342,8 @@ function saveRating(){
 //  RESET
 // ═══════════════════════════════════════════
 function resetAll(){
-  stopPreviewSound();stopPreviewFlow();
+  try{stopPreviewSound()}catch(e){}
+  try{stopPreviewFlow()}catch(e){}
   anchorParams=null;sessions=[];
   try{localStorage.removeItem("anchor_params");localStorage.removeItem("anchor_sessions")}catch(e){}
   showScreen("home");
