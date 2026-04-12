@@ -215,88 +215,104 @@ canvas#flowCanvas{position:absolute;top:0;left:0;width:100%;height:100%}
 
 </div>
 
-<!-- BOOTSTRAP: Pure ES5, cannot fail. Handles navigation even if main script crashes -->
+<!-- BOOTSTRAP: Pure ES5, self-sufficient -->
 <script>
 (function(){
   "use strict";
-  // Screen navigation
+  window._showError = function(msg) {
+    var d = document.getElementById("errorBanner");
+    if (!d) {
+      d = document.createElement("div");
+      d.id = "errorBanner";
+      d.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;background:#600;color:#fff;font:12px monospace;padding:8px 12px;max-height:30vh;overflow:auto;word-break:break-all";
+      document.body.appendChild(d);
+    }
+    d.textContent += msg + "\n";
+    d.style.display = "block";
+  };
   window.showScreen = function(name) {
     var screens = document.querySelectorAll(".screen");
-    for (var i = 0; i < screens.length; i++) {
-      screens[i].classList.remove("active");
-    }
+    for (var i = 0; i < screens.length; i++) screens[i].classList.remove("active");
     var target = document.getElementById("screen-" + name);
     if (target) target.classList.add("active");
-    // Hook for main script to do extra work on screen change
     if (typeof window._onScreen === "function") {
-      try { window._onScreen(name); } catch(e) {}
+      try { window._onScreen(name); } catch(e) { window._showError("_onScreen: " + e.message); }
     }
   };
-
-  // Bind click to element by ID
+  window._anchorData = null;
+  function createBasicAnchor() {
+    var seed = Date.now() ^ (Math.random() * 999999 | 0);
+    var pals = ["aurora","ember","ocean","forest","nebula","arctic","copper","sakura","moss","storm","mars","deep","gold","coral"];
+    var s = seed;
+    var idx = Math.floor(((s = (s * 16807 + 11) % 2147483647) / 2147483647) * pals.length);
+    window._anchorData = { seed: seed, paletteName: pals[idx], created: true };
+    try { localStorage.setItem("anchor_basic", JSON.stringify(window._anchorData)); } catch(e) {}
+  }
+  try {
+    var saved = localStorage.getItem("anchor_basic");
+    if (saved) window._anchorData = JSON.parse(saved);
+  } catch(e) {}
+  function updateHomeBasic() {
+    var has = !!(window._anchorData && window._anchorData.created);
+    var empty = document.getElementById("emptyState");
+    var ui = document.getElementById("anchorUI");
+    if (empty) empty.style.display = has ? "none" : "flex";
+    if (ui) ui.style.display = has ? "flex" : "none";
+    var rb = document.getElementById("btnReset");
+    if (rb) rb.style.display = has ? "block" : "none";
+    if (has) {
+      var lb = document.getElementById("anchorLabel");
+      if (lb) lb.textContent = window._anchorData.paletteName + " #" + window._anchorData.seed.toString(16).slice(-6);
+      var pl = document.getElementById("progressLabel");
+      if (pl) pl.textContent = "0/10";
+    }
+  }
   function tap(id, fn) {
     var el = document.getElementById(id);
     if (!el) return;
     el.addEventListener("click", fn);
   }
-
-  // Bind all navigation buttons
   tap("btnStart", function() { showScreen("onboarding"); });
   tap("btnOnboardGenerate", function() {
     showScreen("generating");
     if (typeof window.generateAnchor === "function") {
-      try { window.generateAnchor(); } catch(e) {
-        setTimeout(function() { showScreen("home"); }, 2000);
-      }
-    } else {
-      setTimeout(function() { showScreen("home"); }, 2000);
+      try { window.generateAnchor(); return; } catch(e) { window._showError("gen: " + e.message); }
     }
-    // Safety net: if still on generating after 3s, force home
-    setTimeout(function() {
-      var gen = document.getElementById("screen-generating");
-      if (gen && gen.classList.contains("active")) showScreen("home");
-    }, 3000);
+    createBasicAnchor();
+    setTimeout(function() { updateHomeBasic(); showScreen("home"); }, 1800);
   });
   tap("btnCancelSession", function() {
-    if (typeof window.cancelSession === "function") {
-      window.cancelSession();
-    } else {
-      showScreen("home");
-    }
+    if (typeof window.cancelSession === "function") { try { window.cancelSession(); return; } catch(e) {} }
+    showScreen("home");
   });
   tap("btnReset", function() {
-    if (typeof window.resetAll === "function") {
-      window.resetAll();
-    } else {
-      try { localStorage.clear(); } catch(e) {}
-      location.reload();
-    }
+    if (typeof window.resetAll === "function") { try { window.resetAll(); return; } catch(e) {} }
+    window._anchorData = null;
+    try { localStorage.clear(); } catch(e) {}
+    updateHomeBasic();
+    showScreen("home");
   });
   tap("btnReinforce", function() {
-    if (typeof window.startSession === "function") window.startSession(false);
+    if (typeof window.startSession === "function") { try { window.startSession(false); } catch(e) { window._showError("session: " + e.message); } }
   });
   tap("btnActivate", function() {
-    if (typeof window.startSession === "function") window.startSession(true);
+    if (typeof window.startSession === "function") { try { window.startSession(true); } catch(e) { window._showError("activate: " + e.message); } }
   });
   tap("btnPreviewSound", function() {
-    if (typeof window.togglePreviewSound === "function") window.togglePreviewSound();
+    if (typeof window.togglePreviewSound === "function") { try { window.togglePreviewSound(); } catch(e) {} }
   });
   tap("btnRegenerate", function() {
     showScreen("generating");
-    if (typeof window.generateAnchor === "function") {
-      try { window.generateAnchor(); } catch(e) {}
-    }
-    setTimeout(function() {
-      var gen = document.getElementById("screen-generating");
-      if (gen && gen.classList.contains("active")) showScreen("home");
-    }, 3000);
+    if (typeof window.generateAnchor === "function") { try { window.generateAnchor(); return; } catch(e) {} }
+    createBasicAnchor();
+    setTimeout(function() { updateHomeBasic(); showScreen("home"); }, 1800);
   });
   tap("btnSaveRating", function() {
-    if (typeof window.saveRating === "function") window.saveRating();
+    if (typeof window.saveRating === "function") { try { window.saveRating(); return; } catch(e) {} }
+    showScreen("home");
   });
-
-  // Debug: make the bootstrap status visible (remove in production)
-  // document.title = "Anchor [JS OK]";
+  if (window._anchorData && window._anchorData.created) updateHomeBasic();
+  window._bootstrapOK = true;
 })();
 </script>
 
@@ -310,7 +326,7 @@ window.onerror=function(msg,url,line){
 //  SIMPLEX NOISE
 // ═══════════════════════════════════════════
 const GRAD3=[[1,1,0],[-1,1,0],[1,-1,0],[-1,-1,0],[1,0,1],[-1,0,1],[1,0,-1],[-1,0,-1],[0,1,1],[0,-1,1],[0,1,-1],[0,-1,-1]];
-function buildPerm(seed){const p=Array.from({length:256},(_,i)=>i);let s=seed;for(let i=255;i>0;i--){s=(s*16807+11)%2147483647;const j=s%(i+1);[p[i],p[j]]=[p[j],p[i]]}return[...p,...p]}
+function buildPerm(seed){const p=Array.from({length:256},(_,i)=>i);let s=(seed>>>0)||1;for(let i=255;i>0;i--){s=Math.abs((s*16807+11)%2147483647)||1;const j=s%(i+1);[p[i],p[j]]=[p[j],p[i]]}return[...p,...p]}
 function noise2D(perm,x,y){const F2=.5*(Math.sqrt(3)-1),G2=(3-Math.sqrt(3))/6,s=(x+y)*F2,i=Math.floor(x+s),j=Math.floor(y+s),t=(i+j)*G2,x0=x-(i-t),y0=y-(j-t),[i1,j1]=x0>y0?[1,0]:[0,1],x1=x0-i1+G2,y1=y0-j1+G2,x2=x0-1+2*G2,y2=y0-1+2*G2,ii=i&255,jj=j&255;const dot=(gi,dx,dy)=>GRAD3[gi%12][0]*dx+GRAD3[gi%12][1]*dy;let n0=0,n1=0,n2=0,t0=.5-x0*x0-y0*y0;if(t0>0){t0*=t0;n0=t0*t0*dot(perm[ii+perm[jj]],x0,y0)}let t1=.5-x1*x1-y1*y1;if(t1>0){t1*=t1;n1=t1*t1*dot(perm[ii+i1+perm[jj+j1]],x1,y1)}let t2=.5-x2*x2-y2*y2;if(t2>0){t2*=t2;n2=t2*t2*dot(perm[ii+1+perm[jj+1]],x2,y2)}return 70*(n0+n1+n2)}
 
 // ═══════════════════════════════════════════
@@ -367,19 +383,20 @@ const BINAURAL_BANDS=[
 
 function generateSoundDNA(seed){
   let s=seed;
-  const r=()=>{s=(s*16807+11)%2147483647;return s/2147483647};
+  const r=()=>{s=Math.abs((s*16807+11)%2147483647)||1;return s/2147483647};
 
   // Root note: continuous range 65-175 Hz (C2-F3)
   const rootFreq=65+r()*110;
 
   // Pick a scale
   const scaleIdx=Math.floor(r()*SCALE_NAMES.length);
-  const scale=SCALES[SCALE_NAMES[scaleIdx]];
+  const scaleName=SCALE_NAMES[scaleIdx]||"pentatonic";
+  const scale=SCALES[scaleName]||SCALES.pentatonic;
 
   // Pick 3-5 chord tones from scale (as semitone offsets)
   const numTones=3+Math.floor(r()*3);
   const chordTones=[0]; // always include root
-  const available=[...scale.slice(1)];
+  const available=scale.slice(1);
   for(let i=0;i<Math.min(numTones-1,available.length);i++){
     const idx=Math.floor(r()*available.length);
     chordTones.push(available.splice(idx,1)[0]);
@@ -392,13 +409,13 @@ function generateSoundDNA(seed){
   const freqRatios=chordTones.map(st=>Math.pow(2,st/12));
 
   // Waveforms
-  const waveSet=WAVE_SETS[Math.floor(r()*WAVE_SETS.length)];
+  const waveSet=WAVE_SETS[Math.floor(r()*WAVE_SETS.length)]||["sine","sine","sine"];
 
   // Binaural: pick 2 bands, each with specific beat frequency
-  const bin1band=BINAURAL_BANDS[Math.floor(r()*BINAURAL_BANDS.length)];
+  const bin1band=BINAURAL_BANDS[Math.floor(r()*BINAURAL_BANDS.length)]||{lo:8,hi:12};
   const bin1freq=bin1band.lo+r()*(bin1band.hi-bin1band.lo);
   let bin2idx=Math.floor(r()*BINAURAL_BANDS.length);
-  const bin2band=BINAURAL_BANDS[bin2idx];
+  const bin2band=BINAURAL_BANDS[bin2idx]||{lo:4,hi:7};
   const bin2freq=bin2band.lo+r()*(bin2band.hi-bin2band.lo);
 
   // Binaural carrier frequencies (different from chord root for richness)
@@ -500,10 +517,10 @@ function generateSoundDNA(seed){
 const SYMMETRY_MODES=["mirror_x","mirror_y","radial_2","radial_3","radial_4","spiral"];
 
 function generateVisualDNA(seed){
-  let s=seed^0xDEAD;
-  const r=()=>{s=(s*16807+11)%2147483647;return s/2147483647};
+  let s=(seed^0xDEAD)>>>0;
+  const r=()=>{s=Math.abs((s*16807+11)%2147483647)||1;return s/2147483647};
 
-  const symmetry=SYMMETRY_MODES[Math.floor(r()*SYMMETRY_MODES.length)];
+  const symmetry=SYMMETRY_MODES[Math.floor(r()*SYMMETRY_MODES.length)]||"radial_2";
   const loopSeconds=6+Math.floor(r()*5); // 6-10 sec cycle
   const noiseRadius=.3+r()*.5;
   const scale=.003+r()*.005;
@@ -519,8 +536,8 @@ function generateVisualDNA(seed){
   const pulseScale=.02+r()*.04; // always breathe
 
   // Spawn from center region (not full canvas) for focal coherence
-  let ps=seed^0xBEEF;
-  const rp=()=>{ps=(ps*48271+1)%2147483647;return ps/2147483647};
+  let ps=(seed^0xBEEF)>>>0;
+  const rp=()=>{ps=Math.abs((ps*48271+1)%2147483647)||1;return ps/2147483647};
   const spawnData=Array.from({length:numParticles},()=>{
     // Gaussian-ish distribution around center
     const angle=rp()*Math.PI*2;
@@ -541,11 +558,11 @@ function generateVisualDNA(seed){
 }
 
 function generateAnchorParams(seed){
-  let s=seed;const r=()=>{s=(s*16807+11)%2147483647;return s/2147483647};
+  let s=seed;const r=()=>{s=Math.abs((s*16807+11)%2147483647)||1;return s/2147483647};
   const pi=Math.floor(r()*PALETTES.length);
   const soundDNA=generateSoundDNA(seed);
   const visualDNA=generateVisualDNA(seed);
-  return{seed,paletteIdx:pi,palette:PALETTES[pi],soundDNA,visualDNA};
+  return{seed,paletteIdx:pi,palette:PALETTES[pi]||PALETTES[0],soundDNA,visualDNA};
 }
 
 // ═══════════════════════════════════════════
@@ -1150,7 +1167,7 @@ function renderHome(){
   if(!hasAnchor)return;
 
   // Label
-  document.getElementById("anchorLabel").textContent=anchorParams.palette.name+" · #"+anchorParams.seed.toString(16).slice(-6);
+  document.getElementById("anchorLabel").textContent=(anchorParams.palette?anchorParams.palette.name:"anchor")+" · #"+(anchorParams.seed||0).toString(16).slice(-6);
 
   // Preview — double rAF to ensure layout has settled after display:none→flex
   const pc=document.getElementById("previewCanvas");
@@ -1218,12 +1235,13 @@ function generateAnchor(){
   showScreen("generating");
   setTimeout(function(){
     try{
-      var seed=Date.now()^(Math.random()*999999|0);
+      var seed=(Date.now()^(Math.random()*999999|0))>>>0; // >>> 0 forces unsigned 32-bit
       anchorParams=generateAnchorParams(seed);
       sessions=[];
       saveState();
     }catch(e){
       anchorParams=null;sessions=[];
+      if(typeof window._showError==="function") window._showError("generateAnchor: "+e.message);
       try{console.error("generateAnchor error:",e)}catch(e2){}
     }
     showScreen("home");
